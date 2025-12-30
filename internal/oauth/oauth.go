@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	json "encoding/json/v2"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net"
@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	gmailapi "google.golang.org/api/gmail/v1"
+	"google.golang.org/api/gmail/v1"
 
 	"go.withmatt.com/inbox/internal/config"
 )
@@ -35,7 +35,7 @@ func Config() *oauth2.Config {
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Endpoint:     google.Endpoint,
-		Scopes:       []string{gmailapi.GmailModifyScope},
+		Scopes:       []string{gmail.GmailModifyScope, gmail.MailGoogleComScope},
 	}
 }
 
@@ -100,7 +100,8 @@ func getTokenFromWeb(config *oauth2.Config, email string, logf loggerFunc) (*oau
 		return nil, errors.New("missing oauth config")
 	}
 
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	listener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("unable to start oauth callback server: %w", err)
 	}

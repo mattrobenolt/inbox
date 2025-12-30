@@ -132,15 +132,9 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "Y", "enter":
 			refs := append([]threadRef(nil), m.inbox.delete.targets...)
 			action := m.inbox.delete.action
-			confirmStep := m.inbox.delete.confirmStep
-			if action == deleteActionPermanent && confirmStep < 2 {
-				m.inbox.delete.confirmStep = 2
-				return m, nil
-			}
 			m.inbox.delete.pending = false
 			m.inbox.delete.targets = nil
 			m.inbox.delete.action = deleteActionTrash
-			m.inbox.delete.confirmStep = 0
 			if len(refs) == 0 {
 				return m, nil
 			}
@@ -150,7 +144,6 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inbox.delete.pending = false
 			m.inbox.delete.targets = nil
 			m.inbox.delete.action = deleteActionTrash
-			m.inbox.delete.confirmStep = 0
 			return m, nil
 		default:
 			return m, nil
@@ -194,7 +187,6 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.inbox.delete.pending = true
 		m.inbox.delete.targets = refs
 		m.inbox.delete.action = deleteActionArchive
-		m.inbox.delete.confirmStep = 1
 		return m, nil
 	case key.Matches(msg, km.list.Delete):
 		refs := m.selectionOrCurrent()
@@ -204,7 +196,6 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.inbox.delete.pending = true
 		m.inbox.delete.targets = refs
 		m.inbox.delete.action = deleteActionTrash
-		m.inbox.delete.confirmStep = 1
 		return m, nil
 	case key.Matches(msg, km.list.DeleteForever):
 		refs := m.selectionOrCurrent()
@@ -214,7 +205,6 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.inbox.delete.pending = true
 		m.inbox.delete.targets = refs
 		m.inbox.delete.action = deleteActionPermanent
-		m.inbox.delete.confirmStep = 1
 		return m, nil
 	case key.Matches(msg, km.list.Undo):
 		if !m.undoAvailable() || m.inbox.undo.inProgress {
@@ -711,7 +701,6 @@ func (m Model) handleThreadMarked(msg threadMarkedMsg) Model {
 func (m Model) handleThreadsAction(msg threadsActionMsg) (tea.Model, tea.Cmd) {
 	m.inbox.delete.inProgress = false
 	m.inbox.delete.action = deleteActionTrash
-	m.inbox.delete.confirmStep = 0
 	m.inbox.undo.inProgress = false
 	if len(msg.refs) == 0 {
 		return m, nil

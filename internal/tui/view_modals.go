@@ -137,11 +137,7 @@ func (m *Model) renderDeleteModal() string {
 		case deleteActionArchive:
 			b.WriteString("Archive this thread?")
 		case deleteActionPermanent:
-			if m.inbox.delete.confirmStep >= 2 {
-				b.WriteString("Permanently delete this thread? This cannot be undone.")
-			} else {
-				b.WriteString("Delete this thread permanently?")
-			}
+			b.WriteString("Permanently delete this thread? This cannot be undone.")
 		}
 		b.WriteString("\n")
 		if count == 1 {
@@ -164,11 +160,7 @@ func (m *Model) renderDeleteModal() string {
 		case deleteActionArchive:
 			b.WriteString(fmt.Sprintf("Archive %d threads?", count))
 		case deleteActionPermanent:
-			if m.inbox.delete.confirmStep >= 2 {
-				b.WriteString(fmt.Sprintf("Permanently delete %d threads? This cannot be undone.", count))
-			} else {
-				b.WriteString(fmt.Sprintf("Delete %d threads permanently?", count))
-			}
+			b.WriteString(fmt.Sprintf("Permanently delete %d threads? This cannot be undone.", count))
 		}
 	}
 
@@ -178,7 +170,7 @@ func (m *Model) renderDeleteModal() string {
 		Align(lipgloss.Center).
 		Foreground(lipgloss.Color(m.theme.Modal.FooterFg))
 	footer := "y confirm • n cancel"
-	if m.inbox.delete.action == deleteActionPermanent && m.inbox.delete.confirmStep >= 2 {
+	if m.inbox.delete.action == deleteActionPermanent {
 		footer = "y delete • n cancel"
 	}
 	b.WriteString(footerStyle.Render(footer))

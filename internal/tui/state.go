@@ -105,11 +105,10 @@ type threadRef struct {
 }
 
 type deleteState struct {
-	pending     bool
-	inProgress  bool
-	confirmStep int
-	action      deleteAction
-	targets     []threadRef
+	pending    bool
+	inProgress bool
+	action     deleteAction
+	targets    []threadRef
 }
 
 type deleteAction int
