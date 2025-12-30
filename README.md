@@ -2,7 +2,7 @@
 
 > A fast, beautiful, and distraction-free Gmail client for your terminal.
 
-`inbox` is a TUI (Terminal User Interface) built for power users who live in the terminal and want a keyboard-centric way to triage and read email. It supports multiple Gmail accounts, unified searching, and renders HTML emails beautifully.
+`inbox` is a TUI built for power users who live in the terminal and want a keyboard-centric way to triage and read email. It supports multiple Gmail accounts, unified searching, and renders HTML emails beautifully.
 
 ## Features
 

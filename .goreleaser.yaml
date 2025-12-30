@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+
 version: 2
 
 project_name: inbox
@@ -30,16 +32,19 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-brews:
+homebrew_casks:
   - name: inbox
     homepage: https://github.com/mattrobenolt/inbox
     description: A fast, beautiful, and distraction-free Gmail client for your terminal.
-    license: MIT
+    binaries:
+      - inbox
     repository:
       owner: mattrobenolt
       name: homebrew-stuff
       token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
-    install: |
-      bin.install "inbox"
-    test: |
-      system "#{bin}/inbox", "--help"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/inbox"]
+          end
