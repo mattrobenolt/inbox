@@ -48,3 +48,6 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/inbox"]
           end
+    zap:
+      trash:
+        - "~/Library/Application Support/inbox"

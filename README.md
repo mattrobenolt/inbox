@@ -18,7 +18,7 @@
 
 ### Install via Homebrew
 ```bash
-brew install mattrobenolt/stuff/inbox
+brew install --cask mattrobenolt/stuff/inbox
 ```
 
 ### Install via GitHub Releases
