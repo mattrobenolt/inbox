@@ -1,0 +1,74 @@
+version: '2'
+
+linters:
+  enable:
+    - depguard
+    - exhaustive
+    - goconst
+    - gocritic
+    - gomoddirectives
+    - gosec
+    - grouper
+    - inamedparam
+    - makezero
+    - noctx
+    - perfsprint
+    - thelper
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - zerologlint
+  disable:
+    - errcheck
+
+  settings:
+    depguard:
+      rules:
+        stdlib-v2:
+          deny:
+            - pkg: "encoding/json$"
+              desc: "Use encoding/json/v2 instead of encoding/json"
+            - pkg: "math/rand$"
+              desc: "Use math/rand/v2 instead of math/rand"
+        external-alternatives:
+          deny:
+            - pkg: "github.com/go-json-experiment/json"
+              desc: "Use encoding/json/v2 instead of github.com/go-json-experiment/json"
+            - pkg: "github.com/pkg/errors"
+              desc: "Use standard library errors with fmt.Errorf and errors.Is/As instead"
+        stdlib-alternatives:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use standard library errors with fmt.Errorf and errors.Is/As instead"
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1013
+    gosec:
+      excludes:
+        - G104
+        - G115
+        - G304 # File path inclusion - needed for test fixtures
+        - G402 # TLS InsecureSkipVerify - needed for test certificates
+    usestdlibvars:
+      http-method: false
+      http-status-code: false
+
+formatters:
+  enable:
+    - gci
+    - gofumpt
+    - golines
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    gofumpt:
+      module-path: exo
+    golines:
+      max-len: 100
+      chain-split-dots: true

@@ -1,0 +1,113 @@
+# inbox configuration example
+# Copy this to ${XDG_CONFIG_HOME:-~/.config}/inbox/config.toml and customize
+
+[ui]
+# Number of snippet lines in the inbox list (default: 2)
+list_snippet_lines = 2
+# Auto refresh interval in seconds (default: 300, set to -1 to disable)
+refresh_interval_seconds = 300
+
+[[accounts]]
+name = "Personal"
+email = "your.email@gmail.com"
+# Optional badge colors for list view account tag
+# badge_fg = "foreground"
+# badge_bg = "blue"
+
+[[accounts]]
+name = "Work"
+email = "work.email@gmail.com"
+# badge_fg = "background"
+# badge_bg = "cyan"
+
+# Add more accounts as needed
+# [[accounts]]
+# name = "Another Account"
+# email = "another@gmail.com"
+
+# Optional theme configuration
+[theme]
+# Name from go.withmatt.com/themes (optional)
+# name = "Nord"
+# default: "Nord"
+
+# Theme overrides (256-color values or hex supported by lipgloss)
+[theme.status]
+# bg = "238"
+# fg = "231"
+# dim = "245"
+# mode_bg = "63"
+# mode_fg = "231"
+# tab_bg = "60"
+# tab_fg = "231"
+
+[theme.list]
+# unread_fg = "15"
+# selected_fg = "63"
+# read_fg = "245"
+# selected_bg = "237"
+
+[theme.detail]
+# snippet_fg = "245"
+# border_selected = "63"
+# border_normal = "237"
+# header_label_fg = "241"
+# header_value_fg = "245"
+# view_mode_bg = "green"
+# view_mode_fg = "background"
+
+[theme.attachment]
+# title_bg = "63"
+# title_fg = "230"
+# meta_fg = "241"
+
+[theme.image]
+# error_fg = "196"
+# meta_fg = "241"
+
+[theme.modal]
+# footer_fg = "241"
+
+
+# Optional keymap overrides
+[keys.list]
+# up = ["k", "up"]
+# down = ["j", "down"]
+# page_up = ["pgup"]
+# page_down = ["pgdown"]
+# open = ["enter"]
+# toggle_read = ["space"]
+# search = ["/"]
+# refresh = ["r"]
+# help = ["?"]
+# quit = ["q", "esc", "ctrl+c"]
+
+[keys.detail]
+# up = ["k", "up"]
+# down = ["j", "down"]
+# toggle_expand = ["enter", "space"]
+# toggle_view = ["t"]
+# attachments = ["a"]
+# back = ["esc", "q"]
+# help = ["?"]
+# quit = ["ctrl+c"]
+
+[keys.search]
+# submit = ["enter"]
+# cancel = ["esc"]
+# quit = ["ctrl+c"]
+
+[keys.attachment]
+# back = ["esc", "q"]
+# quit = ["ctrl+c"]
+
+[keys.image]
+# back = ["esc", "q"]
+# quit = ["ctrl+c"]
+
+[keys.attachments_modal]
+# up = ["k", "up"]
+# down = ["j", "down"]
+# download = ["enter", "d"]
+# view = ["v"]
+# close = ["esc", "a", "q"]
