@@ -107,7 +107,7 @@ func EnsureTokensDir() error {
 		return err
 	}
 	tokensDir := filepath.Join(dir, "tokens")
-	return os.MkdirAll(tokensDir, 0o750)
+	return os.MkdirAll(tokensDir, 0o700)
 }
 
 // CachePath returns the path to the thread cache file

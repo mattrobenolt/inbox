@@ -23,6 +23,7 @@ func (m Model) updateSpinner(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m = m.clearAlerts()
 	// Close modals on any keypress (except navigation in attachments modal)
 	if m.ui.showHelp {
 		m.ui.showHelp = false
@@ -126,6 +127,35 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	km := m.keyMap()
+	if m.inbox.delete.pending {
+		switch msg.String() {
+		case "y", "Y", "enter":
+			refs := append([]threadRef(nil), m.inbox.delete.targets...)
+			action := m.inbox.delete.action
+			confirmStep := m.inbox.delete.confirmStep
+			if action == deleteActionPermanent && confirmStep < 2 {
+				m.inbox.delete.confirmStep = 2
+				return m, nil
+			}
+			m.inbox.delete.pending = false
+			m.inbox.delete.targets = nil
+			m.inbox.delete.action = deleteActionTrash
+			m.inbox.delete.confirmStep = 0
+			if len(refs) == 0 {
+				return m, nil
+			}
+			m.inbox.delete.inProgress = true
+			return m, m.threadActionCmd(action, refs)
+		case "n", "N", "esc":
+			m.inbox.delete.pending = false
+			m.inbox.delete.targets = nil
+			m.inbox.delete.action = deleteActionTrash
+			m.inbox.delete.confirmStep = 0
+			return m, nil
+		default:
+			return m, nil
+		}
+	}
 	switch {
 	case key.Matches(msg, km.list.Quit):
 		return m, tea.Quit
@@ -148,6 +178,56 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Send API request in background with the target state
 			return m, m.markThreadUnreadCmd(thread.ThreadID, newUnreadState, thread.AccountIndex)
 		}
+	case key.Matches(msg, km.list.ToggleSelect):
+		if idx := m.selectedThreadIndex(); idx >= 0 && idx < len(m.inbox.threads) {
+			m.toggleThreadSelection(idx)
+		}
+		return m, nil
+	case key.Matches(msg, km.list.ClearSelection):
+		m.clearSelection()
+		return m, nil
+	case key.Matches(msg, km.list.Archive):
+		refs := m.selectionOrCurrent()
+		if len(refs) == 0 {
+			return m, nil
+		}
+		m.inbox.delete.pending = true
+		m.inbox.delete.targets = refs
+		m.inbox.delete.action = deleteActionArchive
+		m.inbox.delete.confirmStep = 1
+		return m, nil
+	case key.Matches(msg, km.list.Delete):
+		refs := m.selectionOrCurrent()
+		if len(refs) == 0 {
+			return m, nil
+		}
+		m.inbox.delete.pending = true
+		m.inbox.delete.targets = refs
+		m.inbox.delete.action = deleteActionTrash
+		m.inbox.delete.confirmStep = 1
+		return m, nil
+	case key.Matches(msg, km.list.DeleteForever):
+		refs := m.selectionOrCurrent()
+		if len(refs) == 0 {
+			return m, nil
+		}
+		m.inbox.delete.pending = true
+		m.inbox.delete.targets = refs
+		m.inbox.delete.action = deleteActionPermanent
+		m.inbox.delete.confirmStep = 1
+		return m, nil
+	case key.Matches(msg, km.list.Undo):
+		if !m.undoAvailable() || m.inbox.undo.inProgress {
+			return m, nil
+		}
+		refs := m.undoRefs()
+		if len(refs) == 0 {
+			return m, nil
+		}
+		action := m.inbox.undo.action
+		m.inbox.undo.inProgress = true
+		m = m.clearAlerts()
+		return m, m.undoThreadsCmd(action, refs)
 	case key.Matches(msg, km.list.PageUp):
 		// Jump up by visible page size
 		start, end := m.getVisibleThreadRange()
@@ -457,6 +537,7 @@ func (m Model) handleInboxLoaded(msg inboxLoadedMsg) (tea.Model, tea.Cmd) {
 		m.inbox.filteredIdx = nil
 		m.clampCursor()
 	}
+	m.pruneSelection()
 
 	notify := msg.source == inboxLoadAuto && added > 0
 
@@ -484,11 +565,11 @@ func (m Model) handleInboxLoaded(msg inboxLoadedMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleThreadMetadataLoaded(msg threadMetadataLoadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleThreadMetadataLoaded(msg threadMetadataLoadedMsg) Model {
 	if msg.err != nil {
 		// Silently skip - thread will show as "Loading..."
 		tea.Printf("METADATA: Failed to load thread at index %d: %v", msg.index, msg.err)
-		return m, nil
+		return m
 	}
 	// Update the thread at the specified index with loaded metadata
 	if msg.thread != nil {
@@ -499,7 +580,7 @@ func (m Model) handleThreadMetadataLoaded(msg threadMetadataLoadedMsg) (tea.Mode
 				msg.accountIndex,
 				msg.threadID,
 			)
-			return m, nil
+			return m
 		}
 		// Preserve account info when updating metadata
 		msg.thread.AccountIndex = m.inbox.threads[targetIndex].AccountIndex
@@ -525,18 +606,18 @@ func (m Model) handleThreadMetadataLoaded(msg threadMetadataLoadedMsg) (tea.Mode
 			m.applyFilter(m.search.query)
 		}
 	}
-	return m, nil
+	return m
 }
 
-func (m Model) handleBatchLoadStart(msg batchLoadStartMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBatchLoadStart(msg batchLoadStartMsg) Model {
 	// Track how many threads we're loading
 	m.inbox.loadingThreads += msg.count
-	return m, nil
+	return m
 }
 
 func (m Model) handleBatchThreadMetadataLoaded(
 	msg batchThreadMetadataLoadedMsg,
-) (tea.Model, tea.Cmd) {
+) Model {
 	// Update all threads from batch load
 	for _, result := range msg.results {
 		if result.err != nil {
@@ -568,10 +649,10 @@ func (m Model) handleBatchThreadMetadataLoaded(
 	if m.search.query != "" {
 		m.applyFilter(m.search.query)
 	}
-	return m, nil
+	return m
 }
 
-func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleThreadLoaded(msg threadLoadedMsg) Model {
 	m.detail.loading = false
 	if msg.err != nil {
 		if m.detail.currentThread != nil {
@@ -584,7 +665,7 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
 		}
 		m.ui.err = msg.err
 		m.ui.showError = true
-		return m, nil
+		return m
 	}
 	// Reverse messages so newest is first
 	m.detail.messages = reverseMessages(msg.messages)
@@ -604,10 +685,10 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
 	m.detail.viewport.SetContent(body)
 	// Reset scroll position to top
 	m.detail.viewport.GotoTop()
-	return m, nil
+	return m
 }
 
-func (m Model) handleThreadMarked(msg threadMarkedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleThreadMarked(msg threadMarkedMsg) Model {
 	if msg.err != nil {
 		// Revert optimistic update on error
 		for i := range m.inbox.threads {
@@ -621,13 +702,116 @@ func (m Model) handleThreadMarked(msg threadMarkedMsg) (tea.Model, tea.Cmd) {
 		}
 		m.ui.err = msg.err
 		m.ui.showError = true
-		return m, nil
+		return m
 	}
 	// Success - the optimistic update was correct, no need to update again
-	return m, nil
+	return m
 }
 
-func (m Model) handleAttachmentDownloaded(msg attachmentDownloadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleThreadsAction(msg threadsActionMsg) (tea.Model, tea.Cmd) {
+	m.inbox.delete.inProgress = false
+	m.inbox.delete.action = deleteActionTrash
+	m.inbox.delete.confirmStep = 0
+	m.inbox.undo.inProgress = false
+	if len(msg.refs) == 0 {
+		return m, nil
+	}
+
+	failed := make(map[string]struct{}, len(msg.failed))
+	for _, ref := range msg.failed {
+		failed[threadKey(ref.threadID, ref.accountIndex)] = struct{}{}
+	}
+
+	succeeded := make([]threadRef, 0, len(msg.refs)-len(msg.failed))
+	for _, ref := range msg.refs {
+		if _, ok := failed[threadKey(ref.threadID, ref.accountIndex)]; ok {
+			continue
+		}
+		succeeded = append(succeeded, ref)
+	}
+
+	var undoThreads []gmail.Thread
+	if len(succeeded) > 0 {
+		undoThreads = m.threadsForRefs(succeeded)
+		m.removeThreadsByRefs(succeeded)
+		if m.search.query != "" {
+			m.reapplyFilterPreserveCursor()
+		} else {
+			m.clampCursor()
+		}
+	}
+
+	if msg.err != nil {
+		m.ui.err = msg.err
+		m.ui.showError = true
+	}
+
+	switch msg.action {
+	case deleteActionArchive, deleteActionTrash:
+		if len(undoThreads) > 0 {
+			m.inbox.undo = undoState{action: msg.action, threads: undoThreads}
+		} else {
+			m.inbox.undo = undoState{}
+		}
+	case deleteActionPermanent:
+		m.inbox.undo = undoState{}
+	}
+
+	var toastCmd tea.Cmd
+	if msg.err == nil && len(undoThreads) > 0 {
+		toastCmd = m.undoToastCmd(msg.action, len(undoThreads))
+	}
+
+	return m, toastCmd
+}
+
+func (m Model) handleThreadsUndo(msg threadsUndoMsg) Model {
+	m.inbox.undo.inProgress = false
+	if len(msg.refs) == 0 {
+		return m
+	}
+
+	failed := make(map[string]struct{}, len(msg.failed))
+	for _, ref := range msg.failed {
+		failed[threadKey(ref.threadID, ref.accountIndex)] = struct{}{}
+	}
+
+	reinsert := make([]gmail.Thread, 0, len(msg.refs)-len(msg.failed))
+	remainingUndo := make([]gmail.Thread, 0, len(msg.failed))
+	for _, thread := range m.inbox.undo.threads {
+		key := threadKey(thread.ThreadID, thread.AccountIndex)
+		if _, ok := failed[key]; ok {
+			remainingUndo = append(remainingUndo, thread)
+			continue
+		}
+		reinsert = append(reinsert, thread)
+	}
+
+	if len(reinsert) > 0 {
+		m.inbox.threads = append(m.inbox.threads, reinsert...)
+		if m.search.query != "" {
+			m.reapplyFilterPreserveCursor()
+		} else {
+			sortThreadsByDate(m.inbox.threads)
+			m.clampCursor()
+		}
+	}
+
+	if len(remainingUndo) > 0 {
+		m.inbox.undo.threads = remainingUndo
+	} else {
+		m.inbox.undo = undoState{}
+	}
+
+	if msg.err != nil {
+		m.ui.err = msg.err
+		m.ui.showError = true
+	}
+
+	return m
+}
+
+func (m Model) handleAttachmentDownloaded(msg attachmentDownloadedMsg) Model {
 	// Stop downloading state
 	m.attachments.modal.downloading = false
 	// Close attachments modal
@@ -641,7 +825,7 @@ func (m Model) handleAttachmentDownloaded(msg attachmentDownloadedMsg) (tea.Mode
 		m.ui.showError = true
 	}
 	// On success, just close the modal silently
-	return m, nil
+	return m
 }
 
 func (m Model) handleAttachmentLoaded(msg attachmentLoadedMsg) (tea.Model, tea.Cmd) {
@@ -747,9 +931,13 @@ func (m Model) handleAutoRefresh(msg autoRefreshMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	oldWidth := m.ui.width
 	m.ui.width = msg.Width
 	m.ui.height = msg.Height
 	m.search.input.Width = max(10, msg.Width-4)
+	if msg.Width != oldWidth && msg.Width > 0 {
+		m.ui.alert = newAlertModel(m.theme, msg.Width)
+	}
 
 	// Update viewport size for detail view
 	if m.currentView == viewDetail {

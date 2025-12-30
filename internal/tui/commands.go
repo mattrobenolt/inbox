@@ -64,6 +64,20 @@ type threadMarkedMsg struct {
 	err      error
 }
 
+type threadsActionMsg struct {
+	action deleteAction
+	refs   []threadRef
+	failed []threadRef
+	err    error
+}
+
+type threadsUndoMsg struct {
+	action deleteAction
+	refs   []threadRef
+	failed []threadRef
+	err    error
+}
+
 type clearImageFlagMsg struct{}
 
 type searchDebounceMsg struct {
@@ -457,6 +471,102 @@ func (m *Model) markThreadUnreadCmd(threadID string, unread bool, accountIndex i
 			threadID: threadID,
 			unread:   unread,
 			err:      err,
+		}
+	}
+}
+
+// threadActionCmd performs an action on the specified threads.
+func (m *Model) threadActionCmd(action deleteAction, refs []threadRef) tea.Cmd {
+	return func() tea.Msg {
+		if len(refs) == 0 {
+			return threadsActionMsg{action: action}
+		}
+
+		failed := make([]threadRef, 0)
+		var firstErr error
+		for _, ref := range refs {
+			if ref.accountIndex < 0 || ref.accountIndex >= len(m.clients) {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("invalid account index %d", ref.accountIndex)
+				}
+				failed = append(failed, ref)
+				continue
+			}
+			var err error
+			switch action {
+			case deleteActionTrash:
+				err = m.clients[ref.accountIndex].TrashThread(m.ctx, ref.threadID)
+			case deleteActionArchive:
+				err = m.clients[ref.accountIndex].ArchiveThread(m.ctx, ref.threadID)
+			case deleteActionPermanent:
+				err = m.clients[ref.accountIndex].DeleteThread(m.ctx, ref.threadID)
+			}
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				failed = append(failed, ref)
+			}
+		}
+
+		var err error
+		if len(failed) > 0 {
+			err = fmt.Errorf("failed to delete %d thread(s): %w", len(failed), firstErr)
+		}
+
+		return threadsActionMsg{
+			action: action,
+			refs:   refs,
+			failed: failed,
+			err:    err,
+		}
+	}
+}
+
+// undoThreadsCmd reverses the last archive or trash action.
+func (m *Model) undoThreadsCmd(action deleteAction, refs []threadRef) tea.Cmd {
+	return func() tea.Msg {
+		if len(refs) == 0 {
+			return threadsUndoMsg{action: action}
+		}
+
+		failed := make([]threadRef, 0)
+		var firstErr error
+		for _, ref := range refs {
+			if ref.accountIndex < 0 || ref.accountIndex >= len(m.clients) {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("invalid account index %d", ref.accountIndex)
+				}
+				failed = append(failed, ref)
+				continue
+			}
+			var err error
+			switch action {
+			case deleteActionArchive:
+				err = m.clients[ref.accountIndex].UnarchiveThread(m.ctx, ref.threadID)
+			case deleteActionTrash:
+				err = m.clients[ref.accountIndex].UntrashThread(m.ctx, ref.threadID)
+			case deleteActionPermanent:
+				err = errors.New("cannot undo permanent delete")
+			}
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				failed = append(failed, ref)
+			}
+		}
+
+		var err error
+		if len(failed) > 0 {
+			err = fmt.Errorf("failed to undo %d thread(s): %w", len(failed), firstErr)
+		}
+
+		return threadsUndoMsg{
+			action: action,
+			refs:   refs,
+			failed: failed,
+			err:    err,
 		}
 	}
 }

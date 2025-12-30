@@ -68,6 +68,7 @@ func New(
 
 	ui := newUIState()
 	ui.help = newHelpModel(theme)
+	ui.alert = newAlertModel(theme, 0)
 
 	// Create glamour renderer once for reuse
 	r, _ := glamour.NewTermRenderer(
@@ -93,6 +94,7 @@ func New(
 			cursor:       0,
 			scrollOffset: 0,
 			loading:      true,
+			selected:     make(map[string]struct{}),
 		},
 		detail:        newDetailState(),
 		search:        newSearchState(theme),
@@ -118,6 +120,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.loadInboxCmd(inboxLoadInit),
 		m.ui.spinner.Tick,
+		m.ui.alert.Init(),
 		m.autoRefreshCmd(),
 		m.setWindowTitleCmd(),
 	)

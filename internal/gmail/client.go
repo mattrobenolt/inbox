@@ -169,6 +169,41 @@ func (c *Client) MarkThreadUnread(ctx context.Context, threadID string) error {
 	return err
 }
 
+// ArchiveThread removes the INBOX label from a thread.
+func (c *Client) ArchiveThread(ctx context.Context, threadID string) error {
+	req := &gmail.ModifyThreadRequest{
+		RemoveLabelIds: []string{"INBOX"},
+	}
+	_, err := c.srv.Users.Threads.Modify("me", threadID, req).Context(ctx).Do()
+	return err
+}
+
+// UnarchiveThread adds the INBOX label back to a thread.
+func (c *Client) UnarchiveThread(ctx context.Context, threadID string) error {
+	req := &gmail.ModifyThreadRequest{
+		AddLabelIds: []string{"INBOX"},
+	}
+	_, err := c.srv.Users.Threads.Modify("me", threadID, req).Context(ctx).Do()
+	return err
+}
+
+// TrashThread moves a thread to the trash.
+func (c *Client) TrashThread(ctx context.Context, threadID string) error {
+	_, err := c.srv.Users.Threads.Trash("me", threadID).Context(ctx).Do()
+	return err
+}
+
+// UntrashThread moves a thread out of the trash.
+func (c *Client) UntrashThread(ctx context.Context, threadID string) error {
+	_, err := c.srv.Users.Threads.Untrash("me", threadID).Context(ctx).Do()
+	return err
+}
+
+// DeleteThread permanently deletes a thread.
+func (c *Client) DeleteThread(ctx context.Context, threadID string) error {
+	return c.srv.Users.Threads.Delete("me", threadID).Context(ctx).Do()
+}
+
 // DownloadAttachment downloads an attachment and returns the raw bytes
 func (c *Client) DownloadAttachment(
 	ctx context.Context,

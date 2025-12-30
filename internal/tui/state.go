@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"go.dalton.dog/bubbleup"
 
 	"go.withmatt.com/inbox/internal/config"
 	"go.withmatt.com/inbox/internal/gmail"
@@ -18,6 +19,7 @@ type uiState struct {
 	height    int
 	spinner   spinner.Model
 	help      help.Model
+	alert     bubbleup.AlertModel
 	showHelp  bool
 	showError bool
 	err       error
@@ -34,6 +36,9 @@ type inboxState struct {
 	loadingThreads int
 	loadedThreads  int
 	filteredIdx    []int
+	selected       map[string]struct{}
+	delete         deleteState
+	undo           undoState
 }
 
 type detailState struct {
@@ -92,6 +97,33 @@ type searchState struct {
 	remoteLoading    bool
 	remoteGeneration int
 	remoteKeys       map[string]struct{}
+}
+
+type threadRef struct {
+	threadID     string
+	accountIndex int
+}
+
+type deleteState struct {
+	pending     bool
+	inProgress  bool
+	confirmStep int
+	action      deleteAction
+	targets     []threadRef
+}
+
+type deleteAction int
+
+const (
+	deleteActionTrash deleteAction = iota
+	deleteActionArchive
+	deleteActionPermanent
+)
+
+type undoState struct {
+	action     deleteAction
+	inProgress bool
+	threads    []gmail.Thread
 }
 
 func newUIState() uiState {

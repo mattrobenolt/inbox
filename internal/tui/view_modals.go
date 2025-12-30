@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
@@ -44,8 +45,11 @@ func (m *Model) renderHelpModal() string {
 
 	helpModel := m.ui.help
 	helpModel.ShowAll = true
-	helpModel.Width = max(10, modalWidth-4)
-	b.WriteString(helpModel.View(m.keyMap()))
+	helpModel.Width = max(10, min(60, modalWidth-4))
+	b.WriteString(helpModel.FullHelpView(splitHelpColumns(
+		flattenHelpGroups(m.keyMap().FullHelp()),
+		2,
+	)))
 
 	// Footer - properly centered
 	b.WriteString("\n\n")
@@ -56,6 +60,27 @@ func (m *Model) renderHelpModal() string {
 	b.WriteString(footerStyle.Render("Press any key to close"))
 
 	return b.String()
+}
+
+func flattenHelpGroups(groups [][]key.Binding) []key.Binding {
+	var out []key.Binding
+	for _, group := range groups {
+		out = append(out, group...)
+	}
+	return out
+}
+
+func splitHelpColumns(bindings []key.Binding, columns int) [][]key.Binding {
+	if columns <= 1 || len(bindings) == 0 {
+		return [][]key.Binding{bindings}
+	}
+	perColumn := (len(bindings) + columns - 1) / columns
+	out := make([][]key.Binding, 0, columns)
+	for i := 0; i < len(bindings); i += perColumn {
+		end := min(i+perColumn, len(bindings))
+		out = append(out, bindings[i:end])
+	}
+	return out
 }
 
 func (m *Model) renderErrorModal() string {
@@ -80,6 +105,83 @@ func (m *Model) renderErrorModal() string {
 		Width(modalWidth).
 		Align(lipgloss.Center)
 	b.WriteString(footerStyle.Render("Press any key to dismiss"))
+
+	return b.String()
+}
+
+func (m *Model) renderDeleteModal() string {
+	var b strings.Builder
+
+	modalWidth := 60
+	titleStyle := lipgloss.NewStyle().
+		Width(modalWidth).
+		Align(lipgloss.Center).
+		Bold(true)
+	title := "Trash Threads"
+	switch m.inbox.delete.action {
+	case deleteActionTrash:
+		title = "Trash Threads"
+	case deleteActionArchive:
+		title = "Archive Threads"
+	case deleteActionPermanent:
+		title = "Delete Threads"
+	}
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n\n")
+
+	count := len(m.inbox.delete.targets)
+	if count <= 1 {
+		switch m.inbox.delete.action {
+		case deleteActionTrash:
+			b.WriteString("Move this thread to trash?")
+		case deleteActionArchive:
+			b.WriteString("Archive this thread?")
+		case deleteActionPermanent:
+			if m.inbox.delete.confirmStep >= 2 {
+				b.WriteString("Permanently delete this thread? This cannot be undone.")
+			} else {
+				b.WriteString("Delete this thread permanently?")
+			}
+		}
+		b.WriteString("\n")
+		if count == 1 {
+			if thread := m.threadForRef(m.inbox.delete.targets[0]); thread != nil {
+				from := strings.TrimSpace(stripZeroWidth(thread.From))
+				subject := strings.TrimSpace(stripZeroWidth(thread.Subject))
+				maxWidth := modalWidth - 4
+				if from != "" {
+					b.WriteString("\nFrom: " + truncateToWidth(from, maxWidth))
+				}
+				if subject != "" {
+					b.WriteString("\nSubject: " + truncateToWidth(subject, maxWidth))
+				}
+			}
+		}
+	} else {
+		switch m.inbox.delete.action {
+		case deleteActionTrash:
+			b.WriteString(fmt.Sprintf("Move %d threads to trash?", count))
+		case deleteActionArchive:
+			b.WriteString(fmt.Sprintf("Archive %d threads?", count))
+		case deleteActionPermanent:
+			if m.inbox.delete.confirmStep >= 2 {
+				b.WriteString(fmt.Sprintf("Permanently delete %d threads? This cannot be undone.", count))
+			} else {
+				b.WriteString(fmt.Sprintf("Delete %d threads permanently?", count))
+			}
+		}
+	}
+
+	b.WriteString("\n\n")
+	footerStyle := lipgloss.NewStyle().
+		Width(modalWidth).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color(m.theme.Modal.FooterFg))
+	footer := "y confirm • n cancel"
+	if m.inbox.delete.action == deleteActionPermanent && m.inbox.delete.confirmStep >= 2 {
+		footer = "y delete • n cancel"
+	}
+	b.WriteString(footerStyle.Render(footer))
 
 	return b.String()
 }

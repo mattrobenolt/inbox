@@ -41,15 +41,16 @@ func (m Model) View() string {
 	}
 
 	// Overlay modals on top of base view
-	if m.ui.showHelp {
-		return m.overlayModal(output, m.renderHelpModal())
-	}
-	if m.ui.showError && m.ui.err != nil {
-		return m.overlayModal(output, m.renderErrorModal())
-	}
-	if m.attachments.modal.show {
-		return m.overlayModal(output, m.renderAttachmentsModal())
+	switch {
+	case m.ui.showHelp:
+		output = m.overlayModal(output, m.renderHelpModal())
+	case m.ui.showError && m.ui.err != nil:
+		output = m.overlayModal(output, m.renderErrorModal())
+	case m.inbox.delete.pending:
+		output = m.overlayModal(output, m.renderDeleteModal())
+	case m.attachments.modal.show:
+		output = m.overlayModal(output, m.renderAttachmentsModal())
 	}
 
-	return output
+	return m.ui.alert.Render(output)
 }

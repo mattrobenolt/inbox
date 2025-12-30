@@ -10,16 +10,22 @@ type KeyMap struct {
 }
 
 type ListKeyMap struct {
-	Up         []string `toml:"up"`
-	Down       []string `toml:"down"`
-	PageUp     []string `toml:"page_up"`
-	PageDown   []string `toml:"page_down"`
-	Open       []string `toml:"open"`
-	ToggleRead []string `toml:"toggle_read"`
-	Search     []string `toml:"search"`
-	Refresh    []string `toml:"refresh"`
-	Help       []string `toml:"help"`
-	Quit       []string `toml:"quit"`
+	Up             []string `toml:"up"`
+	Down           []string `toml:"down"`
+	PageUp         []string `toml:"page_up"`
+	PageDown       []string `toml:"page_down"`
+	Open           []string `toml:"open"`
+	ToggleRead     []string `toml:"toggle_read"`
+	ToggleSelect   []string `toml:"toggle_select"`
+	ClearSelection []string `toml:"clear_selection"`
+	Archive        []string `toml:"archive"`
+	Delete         []string `toml:"delete"`
+	DeleteForever  []string `toml:"delete_forever"`
+	Undo           []string `toml:"undo"`
+	Search         []string `toml:"search"`
+	Refresh        []string `toml:"refresh"`
+	Help           []string `toml:"help"`
+	Quit           []string `toml:"quit"`
 }
 
 type DetailKeyMap struct {

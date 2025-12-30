@@ -9,16 +9,22 @@ import (
 )
 
 type listKeyMap struct {
-	Up         key.Binding
-	Down       key.Binding
-	PageUp     key.Binding
-	PageDown   key.Binding
-	Open       key.Binding
-	ToggleRead key.Binding
-	Search     key.Binding
-	Refresh    key.Binding
-	Help       key.Binding
-	Quit       key.Binding
+	Up             key.Binding
+	Down           key.Binding
+	PageUp         key.Binding
+	PageDown       key.Binding
+	Open           key.Binding
+	ToggleRead     key.Binding
+	ToggleSelect   key.Binding
+	ClearSelection key.Binding
+	Archive        key.Binding
+	Delete         key.Binding
+	DeleteForever  key.Binding
+	Undo           key.Binding
+	Search         key.Binding
+	Refresh        key.Binding
+	Help           key.Binding
+	Quit           key.Binding
 }
 
 type detailKeyMap struct {
@@ -92,6 +98,30 @@ func keyMapFromConfig(cfg config.KeyMap) keyMap {
 			ToggleRead: makeBinding(
 				bindingDef{keys: []string{" ", "space"}, desc: "read/unread"},
 				cfg.List.ToggleRead,
+			),
+			ToggleSelect: makeBinding(
+				bindingDef{keys: []string{"x"}, desc: "select"},
+				cfg.List.ToggleSelect,
+			),
+			ClearSelection: makeBinding(
+				bindingDef{keys: []string{"X"}, desc: "clear"},
+				cfg.List.ClearSelection,
+			),
+			Archive: makeBinding(
+				bindingDef{keys: []string{"a"}, desc: "archive"},
+				cfg.List.Archive,
+			),
+			Delete: makeBinding(
+				bindingDef{keys: []string{"d"}, desc: "trash"},
+				cfg.List.Delete,
+			),
+			DeleteForever: makeBinding(
+				bindingDef{keys: []string{"D"}, desc: "delete"},
+				cfg.List.DeleteForever,
+			),
+			Undo: makeBinding(
+				bindingDef{keys: []string{"u"}, desc: "undo"},
+				cfg.List.Undo,
 			),
 			Search: makeBinding(
 				bindingDef{keys: []string{"/"}, desc: "search"},
@@ -291,6 +321,10 @@ func (k keyMap) ShortHelp() []key.Binding {
 			k.list.Up,
 			k.list.Down,
 			k.list.Open,
+			k.list.ToggleSelect,
+			k.list.Archive,
+			k.list.Delete,
+			k.list.Undo,
 			k.list.Search,
 			k.list.Help,
 			k.list.Quit,
@@ -339,13 +373,17 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	case viewList:
 		return [][]key.Binding{
 			{k.list.Up, k.list.Down, k.list.PageUp, k.list.PageDown},
-			{k.list.Open, k.list.ToggleRead, k.list.Search, k.list.Refresh},
+			{k.list.Open, k.list.ToggleRead, k.list.ToggleSelect, k.list.ClearSelection},
+			{k.list.Archive, k.list.Delete, k.list.DeleteForever, k.list.Undo},
+			{k.list.Search, k.list.Refresh},
 			{k.list.Help, k.list.Quit},
 		}
 	default:
 		return [][]key.Binding{
 			{k.list.Up, k.list.Down, k.list.PageUp, k.list.PageDown},
-			{k.list.Open, k.list.ToggleRead, k.list.Search, k.list.Refresh},
+			{k.list.Open, k.list.ToggleRead, k.list.ToggleSelect, k.list.ClearSelection},
+			{k.list.Archive, k.list.Delete, k.list.DeleteForever, k.list.Undo},
+			{k.list.Search, k.list.Refresh},
 			{k.list.Help, k.list.Quit},
 		}
 	}

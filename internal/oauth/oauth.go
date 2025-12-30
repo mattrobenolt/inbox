@@ -243,7 +243,7 @@ func saveToken(path string, token *oauth2.Token, logf loggerFunc) {
 	if logf != nil {
 		logf("Saving credential file to: %s\n", path)
 	}
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		if logf != nil {
 			logf("Unable to cache oauth token: %v\n", err)

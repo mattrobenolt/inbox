@@ -7,41 +7,59 @@ import (
 
 // Update handles events and updates the model
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var model tea.Model
+
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
-		return m.updateSpinner(msg)
+		model, cmd = m.updateSpinner(msg)
 	case tea.KeyMsg:
-		return m.updateKey(msg)
+		model, cmd = m.updateKey(msg)
 	case tea.MouseMsg:
-		return m.updateMouse(msg)
+		model, cmd = m.updateMouse(msg)
 	case inboxLoadedMsg:
-		return m.handleInboxLoaded(msg)
+		model, cmd = m.handleInboxLoaded(msg)
 	case threadMetadataLoadedMsg:
-		return m.handleThreadMetadataLoaded(msg)
+		model = m.handleThreadMetadataLoaded(msg)
 	case batchLoadStartMsg:
-		return m.handleBatchLoadStart(msg)
+		model = m.handleBatchLoadStart(msg)
 	case batchThreadMetadataLoadedMsg:
-		return m.handleBatchThreadMetadataLoaded(msg)
+		model = m.handleBatchThreadMetadataLoaded(msg)
 	case threadLoadedMsg:
-		return m.handleThreadLoaded(msg)
+		model = m.handleThreadLoaded(msg)
 	case threadMarkedMsg:
-		return m.handleThreadMarked(msg)
+		model = m.handleThreadMarked(msg)
+	case threadsActionMsg:
+		model, cmd = m.handleThreadsAction(msg)
+	case threadsUndoMsg:
+		model = m.handleThreadsUndo(msg)
 	case attachmentDownloadedMsg:
-		return m.handleAttachmentDownloaded(msg)
+		model = m.handleAttachmentDownloaded(msg)
 	case clearImageFlagMsg:
 		m.image.needsClear = false
-		return m, nil
+		model = m
 	case attachmentLoadedMsg:
-		return m.handleAttachmentLoaded(msg)
+		model, cmd = m.handleAttachmentLoaded(msg)
 	case searchDebounceMsg:
-		return m.handleSearchDebounce(msg)
+		model, cmd = m.handleSearchDebounce(msg)
 	case searchRemoteLoadedMsg:
-		return m.handleSearchRemoteLoaded(msg)
+		model, cmd = m.handleSearchRemoteLoaded(msg)
 	case autoRefreshMsg:
-		return m.handleAutoRefresh(msg)
+		model, cmd = m.handleAutoRefresh(msg)
 	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
+		model, cmd = m.handleWindowSize(msg)
 	default:
-		return m, nil
+		model = m
 	}
+
+	if model == nil {
+		model = m
+	}
+
+	updatedModel, ok := model.(Model)
+	if !ok {
+		return model, cmd
+	}
+	updatedModel, alertCmd := updatedModel.updateAlerts(msg)
+	return updatedModel, tea.Batch(cmd, alertCmd)
 }

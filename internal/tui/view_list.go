@@ -31,7 +31,7 @@ func rightPartsWidth(parts []rightPart) int {
 	return width
 }
 
-func rightPartsText(parts []rightPart) string {
+func rightPartsText(parts []rightPart, lead string) string {
 	var b strings.Builder
 	first := true
 	for _, part := range parts {
@@ -47,10 +47,10 @@ func rightPartsText(parts []rightPart) string {
 	if b.Len() == 0 {
 		return ""
 	}
-	return " " + b.String()
+	return lead + b.String()
 }
 
-func renderRightParts(parts []rightPart) string {
+func renderRightParts(parts []rightPart, space string, lead string) string {
 	var b strings.Builder
 	first := true
 	for _, part := range parts {
@@ -58,7 +58,7 @@ func renderRightParts(parts []rightPart) string {
 			continue
 		}
 		if !first {
-			b.WriteString(" ")
+			b.WriteString(space)
 		}
 		b.WriteString(part.style.Render(part.text))
 		first = false
@@ -66,7 +66,7 @@ func renderRightParts(parts []rightPart) string {
 	if b.Len() == 0 {
 		return ""
 	}
-	return " " + b.String()
+	return lead + b.String()
 }
 
 // getVisibleThreadRange calculates which threads should be visible.
@@ -119,8 +119,12 @@ func (m *Model) renderListView() string {
 		Padding(0, cardPadding).
 		Height(cardBodyHeight).
 		MaxHeight(cardBodyHeight)
+	selectedBg := strings.TrimSpace(m.theme.List.SelectedBg)
+	bulkBg := lipgloss.Color(selectedBg)
 
 	selectedBarStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(m.theme.List.SelectedFg))
+	bulkSelectedBarStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(m.theme.List.SelectedFg))
 	unreadBarStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(m.theme.List.UnreadFg)).
@@ -170,32 +174,85 @@ func (m *Model) renderListView() string {
 			thread := m.inbox.threads[threadIndex]
 
 			isSelected := i == m.inbox.cursor
+			isBulkSelected := m.isThreadSelected(thread)
+			useBulkBg := isBulkSelected && selectedBg != ""
+
+			lineUnreadStyle := unreadStyle
+			lineReadStyle := readStyle
+			lineDimStyle := dimStyle
+			lineSnippetStyle := snippetStyle
+			lineUnreadSnippetStyle := unreadSnippetStyle
+			lineSelectedBarStyle := selectedBarStyle
+			lineBulkSelectedBarStyle := bulkSelectedBarStyle
+			lineUnreadBarStyle := unreadBarStyle
+			lineSpaceStyle := lipgloss.NewStyle()
+			if useBulkBg {
+				lineUnreadStyle = lineUnreadStyle.Background(bulkBg)
+				lineReadStyle = lineReadStyle.Background(bulkBg)
+				lineDimStyle = lineDimStyle.Background(bulkBg)
+				lineSnippetStyle = lineSnippetStyle.Background(bulkBg)
+				lineUnreadSnippetStyle = lineUnreadSnippetStyle.Background(bulkBg)
+				lineSelectedBarStyle = lineSelectedBarStyle.Background(bulkBg)
+				lineBulkSelectedBarStyle = lineBulkSelectedBarStyle.Background(bulkBg)
+				lineUnreadBarStyle = lineUnreadBarStyle.Background(bulkBg)
+				lineSpaceStyle = lineSpaceStyle.Background(bulkBg)
+			}
 			prefix := " "
-			if isSelected {
-				prefix = selectedBarStyle.Render("┃")
-			} else if thread.Unread {
-				prefix = unreadBarStyle.Render("│")
+			switch {
+			case isSelected:
+				prefix = lineSelectedBarStyle.Render("┃")
+			case isBulkSelected:
+				prefix = lineBulkSelectedBarStyle.Render("▌")
+			case thread.Unread:
+				prefix = lineUnreadBarStyle.Render("│")
 			}
 			prefixWidth := lipgloss.Width(prefix)
+			suffix := " "
+			if isBulkSelected {
+				suffix = lineBulkSelectedBarStyle.Render("▐")
+			} else if useBulkBg {
+				suffix = lineSpaceStyle.Render(" ")
+			}
+			suffixWidth := lipgloss.Width(suffix)
+			lineWidth := max(contentWidth-prefixWidth-suffixWidth, 0)
+			space := " "
+			if useBulkBg {
+				space = lineSpaceStyle.Render(" ")
+			}
+			lead := space
 
 			// Show loading state if metadata not loaded
 			if !thread.Loaded {
 				var cardContent strings.Builder
-				lineWidth := max(contentWidth-prefixWidth, 0)
 
 				// Line 1: Empty line (matches from + date line)
 				cardContent.WriteString(prefix)
-				cardContent.WriteString(strings.Repeat(" ", lineWidth))
+				blankLine := strings.Repeat(" ", lineWidth)
+				if useBulkBg {
+					blankLine = lineSpaceStyle.Render(blankLine)
+				}
+				cardContent.WriteString(blankLine)
+				cardContent.WriteString(suffix)
 				cardContent.WriteString("\n")
 
 				// Line 2: Loading message (matches subject line)
 				loadingText := "Loading..."
 				cardContent.WriteString(prefix)
-				cardContent.WriteString(padToWidth(loadingText, lineWidth))
+				loadingLine := padToWidth(loadingText, lineWidth)
+				if useBulkBg {
+					loadingLine = lineDimStyle.Render(loadingLine)
+				}
+				cardContent.WriteString(loadingLine)
+				cardContent.WriteString(suffix)
 				for line := 0; line < snippetLines; line++ {
 					cardContent.WriteString("\n")
 					cardContent.WriteString(prefix)
-					cardContent.WriteString(strings.Repeat(" ", lineWidth))
+					blankLine = strings.Repeat(" ", lineWidth)
+					if useBulkBg {
+						blankLine = lineSpaceStyle.Render(blankLine)
+					}
+					cardContent.WriteString(blankLine)
+					cardContent.WriteString(suffix)
 				}
 
 				body.WriteString(cardStyle.Render(cardContent.String()))
@@ -248,25 +305,28 @@ func (m *Model) renderListView() string {
 					Background(lipgloss.Color(badgeBg)).
 					Foreground(lipgloss.Color(badgeFg)).
 					Bold(true)
+				if useBulkBg {
+					accountStyle = accountStyle.Background(bulkBg)
+				}
 			}
 
 			buildParts := func(indicators, account, date string) []rightPart {
 				parts := []rightPart{}
 				if indicators != "" {
-					parts = append(parts, rightPart{text: indicators, style: dimStyle})
+					parts = append(parts, rightPart{text: indicators, style: lineDimStyle})
 				}
 				if account != "" {
 					parts = append(parts, rightPart{text: account, style: accountStyle})
 				}
 				if date != "" {
-					parts = append(parts, rightPart{text: date, style: dimStyle})
+					parts = append(parts, rightPart{text: date, style: lineDimStyle})
 				}
 				return parts
 			}
 
 			parts := buildParts(indicatorsText, accountText, date)
 
-			maxRightWidth := max(contentWidth-prefixWidth, 0)
+			maxRightWidth := max(lineWidth, 0)
 			if maxRightWidth > 0 && rightPartsWidth(parts) > maxRightWidth {
 				accountText = ""
 				parts = buildParts(indicatorsText, accountText, date)
@@ -280,15 +340,15 @@ func (m *Model) renderListView() string {
 			if maxRightWidth == 0 {
 				rightInfoRendered = ""
 			} else {
-				rightInfoRendered = renderRightParts(parts)
+				rightInfoRendered = renderRightParts(parts, space, lead)
 				if maxRightWidth > 0 && lipgloss.Width(rightInfoRendered) > maxRightWidth {
-					rightInfoText := rightPartsText(parts)
+					rightInfoText := rightPartsText(parts, " ")
 					rightInfoText = truncateToWidth(rightInfoText, maxRightWidth)
-					rightInfoRendered = dimStyle.Render(rightInfoText)
+					rightInfoRendered = lineDimStyle.Render(rightInfoText)
 				}
 			}
 
-			availableFrom := max(contentWidth-prefixWidth-lipgloss.Width(rightInfoRendered), 0)
+			availableFrom := max(lineWidth-lipgloss.Width(rightInfoRendered), 0)
 			fromMax := min(availableFrom, 40)
 			if fromMax > 0 {
 				from = truncateToWidth(from, fromMax)
@@ -296,35 +356,36 @@ func (m *Model) renderListView() string {
 				from = ""
 			}
 
-			fromStyle := readStyle
+			fromStyle := lineReadStyle
 			if thread.Unread {
-				fromStyle = unreadStyle
+				fromStyle = lineUnreadStyle
 			}
 
 			line1Left := prefix + fromStyle.Render(from)
-			if contentWidth > 0 {
-				leftWidth := prefixWidth + lipgloss.Width(from)
-				padding := contentWidth - leftWidth - lipgloss.Width(rightInfoRendered)
+			if lineWidth > 0 {
+				leftWidth := lipgloss.Width(from)
+				padding := lineWidth - leftWidth - lipgloss.Width(rightInfoRendered)
 				if padding > 0 {
-					line1Left += strings.Repeat(" ", padding)
+					line1Left += strings.Repeat(space, padding)
 				}
 			}
-			line1 := line1Left + rightInfoRendered
+			line1 := line1Left + rightInfoRendered + suffix
 
 			// Style based on read/unread
-			subjectStyle := readStyle
+			subjectStyle := lineReadStyle
 			if thread.Unread {
-				subjectStyle = unreadStyle
+				subjectStyle = lineUnreadStyle
 			}
 
 			// Line 2: Subject
 			subject := thread.Subject
 			subject = stripZeroWidth(subject)
-			subjectWidth := max(contentWidth-prefixWidth, 0)
+			subjectWidth := max(lineWidth, 0)
 			if subjectWidth > 0 {
 				subject = truncateToWidth(subject, subjectWidth)
+				subject = padToWidth(subject, subjectWidth)
 			}
-			line2 := prefix + subjectStyle.Render(subject)
+			line2 := prefix + subjectStyle.Render(subject) + suffix
 
 			// Snippet lines
 			snippet := thread.Snippet
@@ -339,9 +400,8 @@ func (m *Model) renderListView() string {
 			cardContent.WriteString(line1)
 			cardContent.WriteString("\n")
 			cardContent.WriteString(line2)
-			lineSnippetStyle := snippetStyle
 			if thread.Unread {
-				lineSnippetStyle = unreadSnippetStyle
+				lineSnippetStyle = lineUnreadSnippetStyle
 			}
 			for lineIdx := 0; lineIdx < snippetLines; lineIdx++ {
 				line := ""
@@ -353,9 +413,14 @@ func (m *Model) renderListView() string {
 				cardContent.WriteString("\n")
 				cardContent.WriteString(prefix)
 				cardContent.WriteString(lineSnippetStyle.Render(line))
+				cardContent.WriteString(suffix)
 			}
 
-			body.WriteString(cardStyle.Render(cardContent.String()))
+			renderStyle := cardStyle
+			if useBulkBg {
+				renderStyle = renderStyle.Background(lipgloss.Color(selectedBg))
+			}
+			body.WriteString(renderStyle.Render(cardContent.String()))
 			body.WriteString("\n\n")
 		}
 	}
@@ -406,6 +471,9 @@ func (m *Model) renderListStatusline() string {
 	} else {
 		left = append(left, statusTextSegment(m.theme, fmt.Sprintf("threads %d", count)))
 	}
+	if selectedCount := m.selectedCount(); selectedCount > 0 {
+		left = append(left, statusTextSegment(m.theme, fmt.Sprintf("selected %d", selectedCount)))
+	}
 
 	right := []statusSegment{}
 	switch {
@@ -422,18 +490,42 @@ func (m *Model) renderListStatusline() string {
 		right = append(right, statusDimSegment(m.theme, "loading"))
 	case m.search.remoteLoading:
 		right = append(right, statusDimSegment(m.theme, "searching"))
+	case m.inbox.undo.inProgress:
+		right = append(right, statusDimSegment(m.theme, "undoing"))
+	case m.inbox.delete.inProgress:
+		label := "deleting"
+		switch m.inbox.delete.action {
+		case deleteActionArchive:
+			label = "archiving"
+		case deleteActionTrash:
+			label = "trashing"
+		case deleteActionPermanent:
+			label = "deleting"
+		}
+		right = append(right, statusDimSegment(m.theme, label))
 	}
 
 	right = append(right, statusTextSegment(m.theme, fmt.Sprintf("%d/%d", pos, count)))
 
-	if m.search.active {
+	switch {
+	case m.inbox.delete.pending:
+		right = append(
+			right,
+			statusDimSegment(m.theme, "y confirm"),
+			statusDimSegment(m.theme, "n cancel"),
+		)
+	case m.search.active:
 		right = append(
 			right,
 			statusDimSegment(m.theme, "enter apply"),
 			statusDimSegment(m.theme, "esc cancel"),
 		)
-	} else {
-		right = append(right, statusDimSegment(m.theme, "? help"), statusDimSegment(m.theme, "q quit"))
+	default:
+		right = append(
+			right,
+			statusDimSegment(m.theme, "? help"),
+			statusDimSegment(m.theme, "q quit"),
+		)
 	}
 
 	return renderStatusline(m.theme, m.ui.width, left, right)
