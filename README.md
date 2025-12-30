@@ -2,6 +2,9 @@
 
 > A fast, beautiful, and distraction-free Gmail client for your terminal.
 
+<img width="810" height="765" alt="CleanShot 2025-12-30 at 14 36 50@2x" src="https://github.com/user-attachments/assets/2a989a31-20fb-4ac4-92e6-c76d3dc520ef" />
+
+
 `inbox` is a TUI built for power users who live in the terminal and want a keyboard-centric way to triage and read email. It supports multiple Gmail accounts, unified searching, and renders HTML emails beautifully.
 
 ## Features
