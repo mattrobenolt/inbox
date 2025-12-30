@@ -26,7 +26,7 @@ esac
 
 version="${VERSION:-}"
 if [ -z "$version" ]; then
-    tag="$(curl -sSfL "https://api.github.com/repos/${repo}/releases/latest" | awk -F '\"' '/\"tag_name\":/ {print $4; exit}')"
+    tag="$(curl -sSfL "https://api.github.com/repos/${repo}/releases/latest" | awk -F '"' '/"tag_name":/ {print $4; exit}')"
     if [ -z "$tag" ]; then
         echo "Unable to determine latest version." >&2
         exit 1

@@ -21,10 +21,11 @@ builds:
 
 archives:
   - id: default
-    builds:
+    ids:
       - inbox
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-    format: tar.gz
+    formats:
+      - tar.gz
 
 checksum:
   name_template: 'checksums.txt'

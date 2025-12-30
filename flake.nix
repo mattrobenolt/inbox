@@ -32,6 +32,7 @@
             golangci-lint
             just
             shellcheck
+            goreleaser
           ];
           GOEXPERIMENT="jsonv2";
         };
