@@ -25,6 +25,13 @@ type threadLoadedMsg struct {
 	err      error
 }
 
+type messageRawLoadedMsg struct {
+	threadID  string
+	messageID string
+	raw       string
+	err       error
+}
+
 type inboxLoadSource int
 
 const (
@@ -331,6 +338,26 @@ func (m *Model) loadThreadCmd(thread *gmail.Thread) tea.Cmd {
 		return threadLoadedMsg{
 			messages: messages,
 			err:      err,
+		}
+	}
+}
+
+// loadMessageRawCmd loads the raw source for a single message.
+func (m *Model) loadMessageRawCmd(threadID, messageID string, accountIndex int) tea.Cmd {
+	return func() tea.Msg {
+		if accountIndex < 0 || accountIndex >= len(m.clients) {
+			return messageRawLoadedMsg{
+				threadID:  threadID,
+				messageID: messageID,
+				err:       fmt.Errorf("invalid account index %d", accountIndex),
+			}
+		}
+		raw, err := m.clients[accountIndex].GetMessageRaw(m.ctx, messageID)
+		return messageRawLoadedMsg{
+			threadID:  threadID,
+			messageID: messageID,
+			raw:       raw,
+			err:       err,
 		}
 	}
 }

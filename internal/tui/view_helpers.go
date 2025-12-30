@@ -76,6 +76,16 @@ func (m *Model) renderMarkdown(text string) string {
 	return strings.TrimSpace(rendered)
 }
 
+func normalizeRawForDisplay(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	// Terminals handle LF better than CRLF for display.
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	raw = strings.ReplaceAll(raw, "\r", "\n")
+	return raw
+}
+
 func formatAttachmentSize(size int64) string {
 	if size < 0 {
 		return ""

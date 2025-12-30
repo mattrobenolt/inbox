@@ -11,7 +11,7 @@ modernize:
 lint:
     golangci-lint run
 
-fmt:
+fmt: modernize
     golangci-lint fmt
 
 build:

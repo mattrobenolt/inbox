@@ -3,6 +3,7 @@ package gmail
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"strings"
 
@@ -128,6 +129,26 @@ func (c *Client) GetMessage(ctx context.Context, messageID string) (*Message, er
 	}
 
 	return GmailToMessage(msg), nil
+}
+
+// GetMessageRaw fetches a single message raw source and decodes it to text.
+func (c *Client) GetMessageRaw(ctx context.Context, messageID string) (string, error) {
+	msg, err := c.srv.Users.Messages.Get("me", messageID).Format("raw").Do()
+	if err != nil {
+		return "", err
+	}
+	if msg.Raw == "" {
+		return "", errors.New("raw message empty")
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(msg.Raw)
+	if err != nil {
+		decoded, err = base64.RawURLEncoding.DecodeString(msg.Raw)
+		if err != nil {
+			return "", err
+		}
+	}
+	return string(decoded), nil
 }
 
 // GetLabels fetches all labels

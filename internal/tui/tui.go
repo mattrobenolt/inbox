@@ -27,6 +27,7 @@ type messageViewMode int
 const (
 	viewModeText messageViewMode = iota
 	viewModeHTML
+	viewModeRaw
 )
 
 // Model is the TUI application state

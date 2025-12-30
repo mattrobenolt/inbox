@@ -26,7 +26,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case batchThreadMetadataLoadedMsg:
 		model = m.handleBatchThreadMetadataLoaded(msg)
 	case threadLoadedMsg:
-		model = m.handleThreadLoaded(msg)
+		model, cmd = m.handleThreadLoaded(msg)
 	case threadMarkedMsg:
 		model = m.handleThreadMarked(msg)
 	case threadsActionMsg:
@@ -40,6 +40,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model = m
 	case attachmentLoadedMsg:
 		model, cmd = m.handleAttachmentLoaded(msg)
+	case messageRawLoadedMsg:
+		model = m.handleMessageRawLoaded(msg)
 	case searchDebounceMsg:
 		model, cmd = m.handleSearchDebounce(msg)
 	case searchRemoteLoadedMsg:

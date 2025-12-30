@@ -50,6 +50,7 @@ type detailState struct {
 	selectedMessageIdx   int
 	messageViewMode      messageViewMode
 	savedViewportYOffset int
+	rawLoading           map[string]bool
 }
 
 type attachmentsModalState struct {
@@ -136,6 +137,7 @@ func newDetailState() detailState {
 	return detailState{
 		viewport:         viewport.New(0, 0),
 		expandedMessages: make(map[string]bool),
+		rawLoading:       make(map[string]bool),
 	}
 }
 
@@ -183,6 +185,7 @@ func (m *Model) resetDetail() {
 	m.detail.selectedMessageIdx = 0
 	m.detail.messageViewMode = viewModeText
 	m.detail.savedViewportYOffset = 0
+	m.detail.rawLoading = make(map[string]bool)
 }
 
 func (m *Model) resetAttachmentPreview() {

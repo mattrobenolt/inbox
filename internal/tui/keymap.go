@@ -151,7 +151,7 @@ func keyMapFromConfig(cfg config.KeyMap) keyMap {
 				cfg.Detail.ToggleExpand,
 			),
 			ToggleView: makeBinding(
-				bindingDef{keys: []string{"t"}, desc: "toggle html"},
+				bindingDef{keys: []string{"t"}, desc: "toggle view"},
 				cfg.Detail.ToggleView,
 			),
 			Attachments: makeBinding(

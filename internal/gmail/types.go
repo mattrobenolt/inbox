@@ -37,6 +37,7 @@ type Message struct {
 	Snippet     string       `json:"snippet"`
 	BodyText    string       `json:"body_text,omitempty"`
 	BodyHTML    string       `json:"body_html,omitempty"`
+	Raw         string       `json:"raw,omitempty"`
 	Labels      []string     `json:"labels"`
 	Attachments []Attachment `json:"attachments,omitempty"`
 }

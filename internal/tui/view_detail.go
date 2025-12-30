@@ -9,12 +9,12 @@ import (
 
 func (m *Model) renderDetailView() string {
 	if m.detail.loading {
-		footer := m.renderDetailStatusline(0, false, true)
+		footer := m.renderDetailStatusline(0, false, true, m.detail.messageViewMode)
 		return renderFixedLayout(m.ui.height, "", footer)
 	}
 
 	if len(m.detail.messages) == 0 {
-		footer := m.renderDetailStatusline(0, false, false)
+		footer := m.renderDetailStatusline(0, false, false, m.detail.messageViewMode)
 		return renderFixedLayout(m.ui.height, "No messages loaded", footer)
 	}
 
@@ -23,18 +23,26 @@ func (m *Model) renderDetailView() string {
 	scrollPercent := int(m.detail.viewport.ScrollPercent() * 100)
 
 	canToggle := false
+	selectedMode := m.detail.messageViewMode
 	if m.detail.selectedMessageIdx >= 0 && m.detail.selectedMessageIdx < len(m.detail.messages) {
 		msg := m.detail.messages[m.detail.selectedMessageIdx]
-		if m.detail.expandedMessages[msg.ID] && msg.BodyText != "" && msg.BodyHTML != "" {
+		modes := availableMessageViewModes(msg)
+		if m.detail.expandedMessages[msg.ID] && len(modes) > 0 {
 			canToggle = true
 		}
+		selectedMode = normalizeMessageViewMode(selectedMode, msg)
 	}
-	footer := m.renderDetailStatusline(scrollPercent, canToggle, false)
+	footer := m.renderDetailStatusline(scrollPercent, canToggle, false, selectedMode)
 
 	return renderFixedLayout(m.ui.height, body, footer)
 }
 
-func (m *Model) renderDetailStatusline(scrollPercent int, canToggle bool, loading bool) string {
+func (m *Model) renderDetailStatusline(
+	scrollPercent int,
+	canToggle bool,
+	loading bool,
+	selectedMode messageViewMode,
+) string {
 	label := "MESSAGE"
 	if len(m.detail.messages) > 1 {
 		label = "THREAD"
@@ -59,8 +67,13 @@ func (m *Model) renderDetailStatusline(scrollPercent int, canToggle bool, loadin
 	} else {
 		if canToggle {
 			mode := "TEXT"
-			if m.detail.messageViewMode == viewModeHTML {
+			switch selectedMode {
+			case viewModeText:
+				mode = "TEXT"
+			case viewModeHTML:
 				mode = "HTML"
+			case viewModeRaw:
+				mode = "RAW"
 			}
 			modeStyle := lipgloss.NewStyle().
 				Background(lipgloss.Color(m.theme.Detail.ViewModeBg)).
@@ -147,73 +160,86 @@ func (m *Model) renderThreadBody() string {
 		var content strings.Builder
 
 		if isExpanded {
-			// Expanded view - show full message with headers
-			headerLabelStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(m.theme.Detail.HeaderLabelFg)).
-				Bold(true)
+			effectiveMode := normalizeMessageViewMode(m.detail.messageViewMode, msg)
+			if effectiveMode == viewModeRaw {
+				rawText := msg.Raw
+				if rawText == "" {
+					if m.detail.rawLoading[msg.ID] {
+						rawText = "[Loading raw message...]"
+					} else {
+						rawText = "[Raw message unavailable]"
+					}
+				}
+				content.WriteString(normalizeRawForDisplay(rawText))
+			} else {
+				// Expanded view - show full message with headers
+				headerLabelStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color(m.theme.Detail.HeaderLabelFg)).
+					Bold(true)
 
-			headerValueStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(m.theme.Detail.HeaderValueFg))
+				headerValueStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color(m.theme.Detail.HeaderValueFg))
 
-			content.WriteString(headerLabelStyle.Render("From: "))
-			content.WriteString(headerValueStyle.Render(msg.From))
-			content.WriteString("\n")
-			content.WriteString(headerLabelStyle.Render("To:   "))
-			content.WriteString(headerValueStyle.Render(msg.To))
-			content.WriteString("\n")
-			if msg.Cc != "" {
-				content.WriteString(headerLabelStyle.Render("Cc:   "))
-				content.WriteString(headerValueStyle.Render(msg.Cc))
+				content.WriteString(headerLabelStyle.Render("From: "))
+				content.WriteString(headerValueStyle.Render(msg.From))
 				content.WriteString("\n")
-			}
-			content.WriteString(headerLabelStyle.Render("Date: "))
-			content.WriteString(
-				headerValueStyle.Render(msg.Date.Format("Mon, Jan 2, 2006 at 3:04 PM")),
-			)
-			content.WriteString("\n")
-
-			// Show attachment count if any
-			if len(msg.Attachments) > 0 {
-				attachmentText := fmt.Sprintf("%d attachment", len(msg.Attachments))
-				if len(msg.Attachments) > 1 {
-					attachmentText += "s"
-				}
-				content.WriteString(headerLabelStyle.Render("Attachments: "))
-				content.WriteString(headerValueStyle.Render(attachmentText))
+				content.WriteString(headerLabelStyle.Render("To:   "))
+				content.WriteString(headerValueStyle.Render(msg.To))
 				content.WriteString("\n")
-			}
-
-			content.WriteString("\n")
-
-			// Render body based on view mode
-			var bodyText string
-			switch {
-			case m.detail.messageViewMode == viewModeHTML && msg.BodyHTML != "":
-				// Clean and convert HTML to markdown, then render with glamour
-				cleanedHTML := cleanHTMLForConversion(msg.BodyHTML)
-				markdown, err := m.renderers.htmlConverter.ConvertString(cleanedHTML)
-				if err != nil {
-					// Fallback to raw HTML if conversion fails
-					bodyText = msg.BodyHTML
-				} else {
-					bodyText = m.renderMarkdown(markdown)
+				if msg.Cc != "" {
+					content.WriteString(headerLabelStyle.Render("Cc:   "))
+					content.WriteString(headerValueStyle.Render(msg.Cc))
+					content.WriteString("\n")
 				}
-			case msg.BodyText != "":
-				// Show plain text through glamour
-				bodyText = m.renderMarkdown(msg.BodyText)
-			case msg.BodyHTML != "":
-				// Fallback: clean and convert HTML to markdown if no plain text
-				cleanedHTML := cleanHTMLForConversion(msg.BodyHTML)
-				markdown, err := m.renderers.htmlConverter.ConvertString(cleanedHTML)
-				if err != nil {
-					bodyText = msg.BodyHTML
-				} else {
-					bodyText = m.renderMarkdown(markdown)
+				content.WriteString(headerLabelStyle.Render("Date: "))
+				content.WriteString(
+					headerValueStyle.Render(msg.Date.Format("Mon, Jan 2, 2006 at 3:04 PM")),
+				)
+				content.WriteString("\n")
+
+				// Show attachment count if any
+				if len(msg.Attachments) > 0 {
+					attachmentText := fmt.Sprintf("%d attachment", len(msg.Attachments))
+					if len(msg.Attachments) > 1 {
+						attachmentText += "s"
+					}
+					content.WriteString(headerLabelStyle.Render("Attachments: "))
+					content.WriteString(headerValueStyle.Render(attachmentText))
+					content.WriteString("\n")
 				}
-			default:
-				bodyText = lipgloss.NewStyle().Italic(true).Render("[No message body]")
+
+				content.WriteString("\n")
+
+				// Render body based on view mode
+				var bodyText string
+				switch {
+				case effectiveMode == viewModeHTML && msg.BodyHTML != "":
+					// Clean and convert HTML to markdown, then render with glamour
+					cleanedHTML := cleanHTMLForConversion(msg.BodyHTML)
+					markdown, err := m.renderers.htmlConverter.ConvertString(cleanedHTML)
+					if err != nil {
+						// Fallback to raw HTML if conversion fails
+						bodyText = msg.BodyHTML
+					} else {
+						bodyText = m.renderMarkdown(markdown)
+					}
+				case effectiveMode == viewModeText && msg.BodyText != "":
+					// Show plain text through glamour
+					bodyText = m.renderMarkdown(msg.BodyText)
+				case msg.BodyHTML != "":
+					// Fallback: clean and convert HTML to markdown if no plain text
+					cleanedHTML := cleanHTMLForConversion(msg.BodyHTML)
+					markdown, err := m.renderers.htmlConverter.ConvertString(cleanedHTML)
+					if err != nil {
+						bodyText = msg.BodyHTML
+					} else {
+						bodyText = m.renderMarkdown(markdown)
+					}
+				default:
+					bodyText = lipgloss.NewStyle().Italic(true).Render("[No message body]")
+				}
+				content.WriteString(strings.TrimSpace(bodyText))
 			}
-			content.WriteString(strings.TrimSpace(bodyText))
 		} else {
 			// Collapsed view - show preview
 			// Get first line of body as preview

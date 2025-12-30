@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -355,11 +356,15 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Go back to list view
 		return m, m.exitDetailView()
 	case key.Matches(msg, km.detail.ToggleView):
-		// Toggle between text and HTML view
-		if m.detail.messageViewMode == viewModeText {
-			m.detail.messageViewMode = viewModeHTML
-		} else {
-			m.detail.messageViewMode = viewModeText
+		// Toggle view mode for the selected message.
+		if m.detail.selectedMessageIdx >= 0 &&
+			m.detail.selectedMessageIdx < len(m.detail.messages) {
+			selected := m.detail.messages[m.detail.selectedMessageIdx]
+			m.detail.messageViewMode = nextMessageViewMode(m.detail.messageViewMode, selected)
+		}
+		var rawCmd tea.Cmd
+		if m.detail.messageViewMode == viewModeRaw {
+			rawCmd = m.loadRawForExpandedMessages()
 		}
 		// Re-render the message and reset viewport position
 		body := m.renderThreadBody()
@@ -367,6 +372,9 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.detail.viewport.GotoTop()
 		m.detail.viewport.YOffset = 0
 		// Force full redraw
+		if rawCmd != nil {
+			return m, tea.Batch(tea.ClearScreen, rawCmd)
+		}
 		return m, tea.ClearScreen
 	case key.Matches(msg, km.detail.Down):
 		if m.detail.selectedMessageIdx < len(m.detail.messages)-1 {
@@ -388,9 +396,16 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.detail.selectedMessageIdx < len(m.detail.messages) {
 			msgID := m.detail.messages[m.detail.selectedMessageIdx].ID
 			m.detail.expandedMessages[msgID] = !m.detail.expandedMessages[msgID]
+			var rawCmd tea.Cmd
+			if m.detail.messageViewMode == viewModeRaw {
+				rawCmd = m.loadRawForExpandedMessages()
+			}
 			// Re-render
 			body := m.renderThreadBody()
 			m.detail.viewport.SetContent(body)
+			if rawCmd != nil {
+				return m, rawCmd
+			}
 		}
 	}
 
@@ -642,7 +657,7 @@ func (m Model) handleBatchThreadMetadataLoaded(
 	return m
 }
 
-func (m Model) handleThreadLoaded(msg threadLoadedMsg) Model {
+func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
 	m.detail.loading = false
 	if msg.err != nil {
 		if m.detail.currentThread != nil {
@@ -655,7 +670,7 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) Model {
 		}
 		m.ui.err = msg.err
 		m.ui.showError = true
-		return m
+		return m, nil
 	}
 	// Reverse messages so newest is first
 	m.detail.messages = reverseMessages(msg.messages)
@@ -667,6 +682,11 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) Model {
 	}
 	m.detail.selectedMessageIdx = 0
 
+	var rawCmd tea.Cmd
+	if m.detail.messageViewMode == viewModeRaw {
+		rawCmd = m.loadRawForExpandedMessages()
+	}
+
 	// Update viewport size first
 	m.detail.viewport.Width = m.ui.width
 	m.detail.viewport.Height = detailViewportHeight(m.ui.height)
@@ -675,7 +695,7 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) Model {
 	m.detail.viewport.SetContent(body)
 	// Reset scroll position to top
 	m.detail.viewport.GotoTop()
-	return m
+	return m, rawCmd
 }
 
 func (m Model) handleThreadMarked(msg threadMarkedMsg) Model {
@@ -849,6 +869,31 @@ func (m Model) handleAttachmentLoaded(msg attachmentLoadedMsg) (tea.Model, tea.C
 	return m, m.setWindowTitleCmd()
 }
 
+func (m Model) handleMessageRawLoaded(msg messageRawLoadedMsg) Model {
+	delete(m.detail.rawLoading, msg.messageID)
+	if msg.err != nil {
+		if m.detail.currentThread != nil && m.detail.currentThread.ThreadID == msg.threadID {
+			m.ui.err = msg.err
+			m.ui.showError = true
+		}
+		return m
+	}
+	if m.detail.currentThread == nil || m.detail.currentThread.ThreadID != msg.threadID {
+		return m
+	}
+	for i := range m.detail.messages {
+		if m.detail.messages[i].ID == msg.messageID {
+			m.detail.messages[i].Raw = msg.raw
+			break
+		}
+	}
+	if m.currentView == viewDetail {
+		body := m.renderThreadBody()
+		m.detail.viewport.SetContent(body)
+	}
+	return m
+}
+
 func (m Model) handleSearchDebounce(msg searchDebounceMsg) (tea.Model, tea.Cmd) {
 	if msg.generation != m.search.remoteGeneration {
 		m.logf(
@@ -1018,6 +1063,68 @@ func (m Model) handleAttachmentsModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func availableMessageViewModes(msg gmail.Message) []messageViewMode {
+	modes := make([]messageViewMode, 0, 3)
+	if msg.BodyText != "" {
+		modes = append(modes, viewModeText)
+	}
+	if msg.BodyHTML != "" {
+		modes = append(modes, viewModeHTML)
+	}
+	modes = append(modes, viewModeRaw)
+	return modes
+}
+
+func normalizeMessageViewMode(current messageViewMode, msg gmail.Message) messageViewMode {
+	modes := availableMessageViewModes(msg)
+	if slices.Contains(modes, current) {
+		return current
+	}
+	return modes[0]
+}
+
+func nextMessageViewMode(current messageViewMode, msg gmail.Message) messageViewMode {
+	modes := availableMessageViewModes(msg)
+	if len(modes) == 1 {
+		return modes[0]
+	}
+	current = normalizeMessageViewMode(current, msg)
+	for i, mode := range modes {
+		if mode == current {
+			return modes[(i+1)%len(modes)]
+		}
+	}
+	return modes[0]
+}
+
+func (m *Model) loadRawForExpandedMessages() tea.Cmd {
+	if m.detail.currentThread == nil || len(m.detail.messages) == 0 {
+		return nil
+	}
+	if m.detail.rawLoading == nil {
+		m.detail.rawLoading = make(map[string]bool)
+	}
+	accountIndex := m.detail.currentThread.AccountIndex
+	threadID := m.detail.currentThread.ThreadID
+
+	var cmds []tea.Cmd
+	for _, msg := range m.detail.messages {
+		if !m.detail.expandedMessages[msg.ID] {
+			continue
+		}
+		if msg.Raw != "" || m.detail.rawLoading[msg.ID] {
+			continue
+		}
+		m.detail.rawLoading[msg.ID] = true
+		cmds = append(cmds, m.loadMessageRawCmd(threadID, msg.ID, accountIndex))
+	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
 }
 
 // reverseMessages reverses a slice of messages so newest appears first
