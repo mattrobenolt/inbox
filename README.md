@@ -16,10 +16,25 @@
 
 ## Installation
 
-### Prerequisites
-- Go 1.25 or later
+### Install via Homebrew
+```bash
+brew install mattrobenolt/stuff/inbox
+```
+
+### Install via GitHub Releases
+Download the latest release for your platform from:
+https://github.com/mattrobenolt/inbox/releases
+
+### Install via curl (GitHub Releases)
+```bash
+curl -sSfL https://raw.githubusercontent.com/mattrobenolt/inbox/main/install.sh | sh
+```
+To customize:
+- `VERSION=0.1.0` to pin a version
+- `BIN_DIR=$HOME/.local/bin` to choose an install dir
 
 ### Install via Go
+
 ```bash
 GOEXPERIMENT=jsonv2 go install go.withmatt.com/inbox@latest
 ```
@@ -27,7 +42,7 @@ Ensure your `$GOPATH/bin` is in your `$PATH` to run the `inbox` command.
 
 ## Quick Start
 
-1. **Install** `inbox` using the command above.
+1. **Install** `inbox` using Homebrew or GitHub Releases.
 2. **Add an account:**
    ```bash
    inbox accounts

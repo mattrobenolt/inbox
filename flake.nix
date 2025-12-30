@@ -31,6 +31,7 @@
             gopls
             golangci-lint
             just
+            shellcheck
           ];
           GOEXPERIMENT="jsonv2";
         };

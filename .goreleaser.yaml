@@ -1,0 +1,44 @@
+version: 2
+
+project_name: inbox
+
+builds:
+  - id: inbox
+    main: .
+    binary: inbox
+    env:
+      - CGO_ENABLED=0
+      - GOEXPERIMENT=jsonv2
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X go.withmatt.com/inbox/cmd.version={{.Version}}
+
+archives:
+  - id: default
+    builds:
+      - inbox
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    format: tar.gz
+
+checksum:
+  name_template: 'checksums.txt'
+
+brews:
+  - name: inbox
+    homepage: https://github.com/mattrobenolt/inbox
+    description: A fast, beautiful, and distraction-free Gmail client for your terminal.
+    license: MIT
+    repository:
+      owner: mattrobenolt
+      name: homebrew-stuff
+      token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
+    install: |
+      bin.install "inbox"
+    test: |
+      system "#{bin}/inbox", "--help"

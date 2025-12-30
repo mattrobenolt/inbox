@@ -4,16 +4,9 @@ Welcome to `inbox`! This guide will walk you through setting up your accounts, c
 
 ## 1. Installation
 
-### Prerequisites
-- Go 1.25 or later
-- **Nix users:** You can use the included `flake.nix` to get a fully configured environment by running `nix develop`.
+Please refer to the [README](README.md) for installation instructions, including pre-built binaries and building from source.
 
-### Install via Go
-```bash
-GOEXPERIMENT=jsonv2 go install go.withmatt.com/inbox@latest
-```
-
-Ensure `$(go env GOPATH)/bin` is in your system `PATH` so you can run the `inbox` command from anywhere.
+Once installed, ensure the `inbox` command is available in your terminal.
 
 ## 2. Setting up Accounts
 

@@ -7,10 +7,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "inbox",
-	Short: "A unified inbox reader for Gmail",
-	Long:  `inbox is a terminal-based unified inbox reader for multiple Gmail accounts.`,
+	Use:     "inbox",
+	Short:   "A unified inbox reader for Gmail",
+	Long:    `inbox is a terminal-based unified inbox reader for multiple Gmail accounts.`,
+	Version: version,
 	CompletionOptions: cobra.CompletionOptions{
 		HiddenDefaultCmd: true,
 	},
