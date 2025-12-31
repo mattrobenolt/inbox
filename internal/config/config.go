@@ -41,7 +41,7 @@ func ConfigPath() (string, error) {
 	return xdg.ConfigFile(filepath.Join(appConfigDir, "config.toml"))
 }
 
-// TokenPath returns the path to the token file for a given email
+// TokenPath returns the legacy token file path for a given email.
 func TokenPath(email string) (string, error) {
 	dir, err := ConfigDir()
 	if err != nil {
@@ -98,16 +98,6 @@ func Save(cfg *Config) error {
 	}
 
 	return nil
-}
-
-// EnsureTokensDir creates the tokens directory if it doesn't exist
-func EnsureTokensDir() error {
-	dir, err := ConfigDir()
-	if err != nil {
-		return err
-	}
-	tokensDir := filepath.Join(dir, "tokens")
-	return os.MkdirAll(tokensDir, 0o700)
 }
 
 // CachePath returns the path to the thread cache file

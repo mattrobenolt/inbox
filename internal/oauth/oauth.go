@@ -12,9 +12,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pkg/browser"
+	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
@@ -26,8 +28,9 @@ const (
 	//nolint:gosec // OAuth client credentials are embedded intentionally.
 	clientID = "812893543388-tml92q3ok88o0cgf7o9dinojselcqttn.apps.googleusercontent.com"
 	//nolint:gosec // OAuth client credentials are embedded intentionally.
-	clientSecret = "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"
-	callbackPath = "/oauth2callback"
+	clientSecret   = "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"
+	callbackPath   = "/oauth2callback"
+	keyringService = "go.withmatt.com/inbox"
 )
 
 func Config() *oauth2.Config {
@@ -39,12 +42,12 @@ func Config() *oauth2.Config {
 	}
 }
 
-func GetClient(ctx context.Context, tokenPath string, email string) (*http.Client, error) {
-	return getClient(ctx, Config(), tokenPath, email, printfLogger)
+func GetClient(ctx context.Context, email string) (*http.Client, error) {
+	return getClient(ctx, Config(), email, printfLogger)
 }
 
-func GetClientQuiet(ctx context.Context, tokenPath string, email string) (*http.Client, error) {
-	return getClient(ctx, Config(), tokenPath, email, nil)
+func GetClientQuiet(ctx context.Context, email string) (*http.Client, error) {
+	return getClient(ctx, Config(), email, nil)
 }
 
 type loggerFunc func(format string, args ...any)
@@ -56,40 +59,59 @@ func printfLogger(format string, args ...any) {
 func getClient(
 	ctx context.Context,
 	oauthCfg *oauth2.Config,
-	tokenPath string,
 	email string,
 	logf loggerFunc,
 ) (*http.Client, error) {
-	if err := config.EnsureTokensDir(); err != nil {
-		return nil, fmt.Errorf("unable to create tokens directory: %w", err)
+	if strings.TrimSpace(email) == "" {
+		return nil, errors.New("missing email for oauth")
 	}
 
-	tok, err := tokenFromFile(tokenPath)
+	tok, err := tokenFromKeyring(email)
 	if err != nil {
-		if logf != nil {
-			logf("No token found for %s, starting authentication...\n", email)
+		if errors.Is(err, keyring.ErrNotFound) {
+			tok, err = tokenFromLegacyFile(email)
+			if err != nil {
+				if logf != nil && !errors.Is(err, os.ErrNotExist) {
+					logf("Unable to read legacy token for %s: %v\n", email, err)
+				}
+				tok = nil
+			} else if err := saveTokenToKeyring(email, tok, logf); err != nil {
+				logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+			} else if err := removeLegacyTokenFile(email); err != nil {
+				logfSafe(logf, "Unable to remove legacy token for %s: %v\n", email, err)
+			}
+		} else {
+			return nil, fmt.Errorf("unable to load oauth token from keyring: %w", err)
 		}
+	}
+
+	if tok == nil {
+		logfSafe(logf, "No token found for %s, starting authentication...\n", email)
 		tok, err = getTokenFromWeb(oauthCfg, email, logf)
 		if err != nil {
 			return nil, err
 		}
-		saveToken(tokenPath, tok, logf)
+		if err := saveTokenToKeyring(email, tok, logf); err != nil {
+			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		}
 	}
 
 	tokenSource := oauthCfg.TokenSource(ctx, tok)
 	newTok, err := tokenSource.Token()
 	if err != nil {
-		if logf != nil {
-			logf("Token refresh failed for %s, re-authenticating...\n", email)
-		}
+		logfSafe(logf, "Token refresh failed for %s, re-authenticating...\n", email)
 		tok, err = getTokenFromWeb(oauthCfg, email, logf)
 		if err != nil {
 			return nil, err
 		}
-		saveToken(tokenPath, tok, logf)
+		if err := saveTokenToKeyring(email, tok, logf); err != nil {
+			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		}
 		tokenSource = oauthCfg.TokenSource(ctx, tok)
 	} else if newTok.AccessToken != tok.AccessToken {
-		saveToken(tokenPath, newTok, logf)
+		if err := saveTokenToKeyring(email, newTok, logf); err != nil {
+			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		}
 	}
 
 	return oauth2.NewClient(ctx, tokenSource), nil
@@ -226,6 +248,74 @@ func generatePKCE() (string, string, error) {
 	return verifier, challenge, nil
 }
 
+func tokenFromKeyring(email string) (*oauth2.Token, error) {
+	value, err := keyring.Get(keyringService, keyringAccount(email))
+	if err != nil {
+		return nil, err
+	}
+
+	tok := &oauth2.Token{}
+	if err := json.Unmarshal([]byte(value), tok); err != nil {
+		return nil, err
+	}
+	return tok, nil
+}
+
+func saveTokenToKeyring(email string, token *oauth2.Token, logf loggerFunc) error {
+	if token == nil {
+		return errors.New("missing oauth token")
+	}
+	data, err := json.Marshal(token)
+	if err != nil {
+		return err
+	}
+	if logf != nil {
+		logf("Saving credential to keyring for: %s\n", email)
+	}
+	return keyring.Set(keyringService, keyringAccount(email), string(data))
+}
+
+func randomState() (string, error) {
+	const size = 16
+	buf := make([]byte, size)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("unable to generate oauth state: %w", err)
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func DeleteToken(email string) error {
+	if strings.TrimSpace(email) == "" {
+		return nil
+	}
+	if err := keyring.Delete(keyringService, keyringAccount(email)); err != nil &&
+		!errors.Is(err, keyring.ErrNotFound) {
+		return fmt.Errorf("unable to delete token from keyring: %w", err)
+	}
+	if err := removeLegacyTokenFile(email); err != nil {
+		return fmt.Errorf("unable to remove legacy token file: %w", err)
+	}
+	return nil
+}
+
+func logfSafe(logf loggerFunc, format string, args ...any) {
+	if logf != nil {
+		logf(format, args...)
+	}
+}
+
+func keyringAccount(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func tokenFromLegacyFile(email string) (*oauth2.Token, error) {
+	tokenPath, err := config.TokenPath(email)
+	if err != nil {
+		return nil, err
+	}
+	return tokenFromFile(tokenPath)
+}
+
 func tokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -240,30 +330,13 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, nil
 }
 
-func saveToken(path string, token *oauth2.Token, logf loggerFunc) {
-	if logf != nil {
-		logf("Saving credential file to: %s\n", path)
-	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+func removeLegacyTokenFile(email string) error {
+	tokenPath, err := config.TokenPath(email)
 	if err != nil {
-		if logf != nil {
-			logf("Unable to cache oauth token: %v\n", err)
-		}
-		return
+		return err
 	}
-	defer f.Close()
-	if err := json.MarshalWrite(f, token); err != nil {
-		if logf != nil {
-			logf("Unable to cache oauth token: %v\n", err)
-		}
+	if err := os.Remove(tokenPath); err != nil && !os.IsNotExist(err) {
+		return err
 	}
-}
-
-func randomState() (string, error) {
-	const size = 16
-	buf := make([]byte, size)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("unable to generate oauth state: %w", err)
-	}
-	return hex.EncodeToString(buf), nil
+	return nil
 }

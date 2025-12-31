@@ -136,11 +136,7 @@ func runAddAccount(ctx context.Context, cfg *config.Config) (string, error) {
 	}
 
 	fmt.Fprintln(os.Stderr, "Opening browser for Gmail authentication...")
-	tokenPath, err := config.TokenPath(email)
-	if err != nil {
-		return "", err
-	}
-	if _, err := oauth.GetClientQuiet(ctx, tokenPath, email); err != nil {
+	if _, err := oauth.GetClientQuiet(ctx, email); err != nil {
 		return fmt.Sprintf("Auth failed: %v", err), nil
 	}
 
@@ -180,7 +176,7 @@ func runRemoveAccount(ctx context.Context, cfg *config.Config) (string, error) {
 				Options(options...).
 				Value(&selected),
 			huh.NewConfirm().
-				Title("Delete token file?").
+				Title("Delete token from keyring?").
 				Affirmative("Yes").
 				Negative("No").
 				Value(&removeToken),
@@ -248,13 +244,8 @@ func removeAccount(cfg *config.Config, email string, removeToken bool) error {
 	}
 
 	if removeToken {
-		tokenPath, err := config.TokenPath(email)
-		if err == nil {
-			if _, err := os.Stat(tokenPath); err == nil {
-				if err := os.Remove(tokenPath); err != nil {
-					return err
-				}
-			}
+		if err := oauth.DeleteToken(email); err != nil {
+			return err
 		}
 	}
 	return nil

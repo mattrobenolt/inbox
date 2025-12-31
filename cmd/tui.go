@@ -73,14 +73,8 @@ func runTUI(cmd *cobra.Command, args []string) error {
 }
 
 func getGmailService(ctx context.Context, email string) (*gmailapi.Service, error) {
-	// Get token path for this email
-	tokenPath, err := config.TokenPath(email)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get OAuth token
-	client, err := oauth.GetClientQuiet(ctx, tokenPath, email)
+	client, err := oauth.GetClientQuiet(ctx, email)
 	if err != nil {
 		return nil, err
 	}
