@@ -22,6 +22,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 
 	"go.withmatt.com/inbox/internal/config"
+	"go.withmatt.com/inbox/internal/log"
 )
 
 const (
@@ -43,24 +44,17 @@ func Config() *oauth2.Config {
 }
 
 func GetClient(ctx context.Context, email string) (*http.Client, error) {
-	return getClient(ctx, Config(), email, printfLogger)
+	return getClient(ctx, Config(), email)
 }
 
 func GetClientQuiet(ctx context.Context, email string) (*http.Client, error) {
-	return getClient(ctx, Config(), email, nil)
-}
-
-type loggerFunc func(format string, args ...any)
-
-func printfLogger(format string, args ...any) {
-	fmt.Printf(format, args...)
+	return getClient(ctx, Config(), email)
 }
 
 func getClient(
 	ctx context.Context,
 	oauthCfg *oauth2.Config,
 	email string,
-	logf loggerFunc,
 ) (*http.Client, error) {
 	if strings.TrimSpace(email) == "" {
 		return nil, errors.New("missing email for oauth")
@@ -71,14 +65,14 @@ func getClient(
 		if errors.Is(err, keyring.ErrNotFound) {
 			tok, err = tokenFromLegacyFile(email)
 			if err != nil {
-				if logf != nil && !errors.Is(err, os.ErrNotExist) {
-					logf("Unable to read legacy token for %s: %v\n", email, err)
+				if !errors.Is(err, os.ErrNotExist) {
+					log.Printf("Unable to read legacy token for %s: %v", email, err)
 				}
 				tok = nil
-			} else if err := saveTokenToKeyring(email, tok, logf); err != nil {
-				logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+			} else if err := saveTokenToKeyring(email, tok); err != nil {
+				log.Printf("Unable to cache oauth token in keyring: %v", err)
 			} else if err := removeLegacyTokenFile(email); err != nil {
-				logfSafe(logf, "Unable to remove legacy token for %s: %v\n", email, err)
+				log.Printf("Unable to remove legacy token for %s: %v", email, err)
 			}
 		} else {
 			return nil, fmt.Errorf("unable to load oauth token from keyring: %w", err)
@@ -86,38 +80,38 @@ func getClient(
 	}
 
 	if tok == nil {
-		logfSafe(logf, "No token found for %s, starting authentication...\n", email)
-		tok, err = getTokenFromWeb(oauthCfg, email, logf)
+		log.Printf("No token found for %s, starting authentication...", email)
+		tok, err = getTokenFromWeb(oauthCfg, email)
 		if err != nil {
 			return nil, err
 		}
-		if err := saveTokenToKeyring(email, tok, logf); err != nil {
-			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		if err := saveTokenToKeyring(email, tok); err != nil {
+			log.Printf("Unable to cache oauth token in keyring: %v", err)
 		}
 	}
 
 	tokenSource := oauthCfg.TokenSource(ctx, tok)
 	newTok, err := tokenSource.Token()
 	if err != nil {
-		logfSafe(logf, "Token refresh failed for %s, re-authenticating...\n", email)
-		tok, err = getTokenFromWeb(oauthCfg, email, logf)
+		log.Printf("Token refresh failed for %s, re-authenticating...", email)
+		tok, err = getTokenFromWeb(oauthCfg, email)
 		if err != nil {
 			return nil, err
 		}
-		if err := saveTokenToKeyring(email, tok, logf); err != nil {
-			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		if err := saveTokenToKeyring(email, tok); err != nil {
+			log.Printf("Unable to cache oauth token in keyring: %v", err)
 		}
 		tokenSource = oauthCfg.TokenSource(ctx, tok)
 	} else if newTok.AccessToken != tok.AccessToken {
-		if err := saveTokenToKeyring(email, newTok, logf); err != nil {
-			logfSafe(logf, "Unable to cache oauth token in keyring: %v\n", err)
+		if err := saveTokenToKeyring(email, newTok); err != nil {
+			log.Printf("Unable to cache oauth token in keyring: %v", err)
 		}
 	}
 
 	return oauth2.NewClient(ctx, tokenSource), nil
 }
 
-func getTokenFromWeb(config *oauth2.Config, email string, logf loggerFunc) (*oauth2.Token, error) {
+func getTokenFromWeb(config *oauth2.Config, email string) (*oauth2.Token, error) {
 	if config == nil {
 		return nil, errors.New("missing oauth config")
 	}
@@ -152,15 +146,11 @@ func getTokenFromWeb(config *oauth2.Config, email string, logf loggerFunc) (*oau
 		oauth2.SetAuthURLParam("code_challenge", pkceChallenge),
 	)
 
-	if logf != nil {
-		logf("\n=== Authentication Required for %s ===\n", email)
-	}
+	log.Printf("Authentication required for %s", email)
 	if err := browser.OpenURL(authURL); err != nil {
-		if logf != nil {
-			logf("Open this URL to authorize:\n%v\n", authURL)
-		}
-	} else if logf != nil {
-		logf("If your browser does not open, visit:\n%v\n", authURL)
+		log.Printf("Open this URL to authorize: %v", authURL)
+	} else {
+		log.Printf("If your browser does not open, visit: %v", authURL)
 	}
 
 	codeCh := make(chan string, 1)
@@ -254,14 +244,14 @@ func tokenFromKeyring(email string) (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	tok := &oauth2.Token{}
-	if err := json.Unmarshal([]byte(value), tok); err != nil {
+	var tok oauth2.Token
+	if err := json.Unmarshal([]byte(value), &tok); err != nil {
 		return nil, err
 	}
-	return tok, nil
+	return &tok, nil
 }
 
-func saveTokenToKeyring(email string, token *oauth2.Token, logf loggerFunc) error {
+func saveTokenToKeyring(email string, token *oauth2.Token) error {
 	if token == nil {
 		return errors.New("missing oauth token")
 	}
@@ -269,9 +259,7 @@ func saveTokenToKeyring(email string, token *oauth2.Token, logf loggerFunc) erro
 	if err != nil {
 		return err
 	}
-	if logf != nil {
-		logf("Saving credential to keyring for: %s\n", email)
-	}
+	log.Printf("Saving credential to keyring for: %s", email)
 	return keyring.Set(keyringService, keyringAccount(email), string(data))
 }
 
@@ -296,12 +284,6 @@ func DeleteToken(email string) error {
 		return fmt.Errorf("unable to remove legacy token file: %w", err)
 	}
 	return nil
-}
-
-func logfSafe(logf loggerFunc, format string, args ...any) {
-	if logf != nil {
-		logf(format, args...)
-	}
 }
 
 func keyringAccount(email string) string {

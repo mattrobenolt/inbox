@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"go.withmatt.com/inbox/internal/log"
 )
 
 var version = "dev"
@@ -18,15 +20,17 @@ var rootCmd = &cobra.Command{
 		HiddenDefaultCmd: true,
 	},
 	RunE: runTUI,
-}
-
-var debug bool
-
-func init() {
-	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		debug, _ := cmd.PersistentFlags().GetBool("debug")
+		return log.Setup(debug)
+	},
+	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		return log.Close()
+	},
 }
 
 func Execute() {
+	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

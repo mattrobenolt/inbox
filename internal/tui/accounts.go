@@ -23,10 +23,6 @@ const (
 )
 
 func RunAccounts(ctx context.Context, cfg *config.Config) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	status := ""
 	for {
 		if err := ctx.Err(); err != nil {

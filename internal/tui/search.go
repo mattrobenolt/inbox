@@ -120,9 +120,7 @@ func (m *Model) applyFilter(query string) {
 		}
 	}
 	m.inbox.filteredIdx = filtered
-	if m.debug {
-		m.logf("Search local filter matched=%d", len(filtered))
-	}
+	m.logf("Search local filter matched=%d", len(filtered))
 
 	m.inbox.cursor = 0
 	if selectedThreadID != "" {

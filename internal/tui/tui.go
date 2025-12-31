@@ -2,8 +2,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	tea "github.com/charmbracelet/bubbletea"
@@ -51,8 +49,7 @@ type Model struct {
 	accountBadges []AccountBadge
 
 	// Context for cancellation
-	ctx   context.Context
-	debug bool
+	ctx context.Context
 }
 
 // New creates a new TUI model
@@ -65,8 +62,6 @@ func New(
 	uiConfig config.UIConfig,
 	keyMapCfg config.KeyMap,
 ) Model {
-	debug := os.Getenv("INBOX_DEBUG") != ""
-
 	ui := newUIState()
 	ui.help = newHelpModel(theme)
 	ui.alert = newAlertModel(theme, 0)
@@ -109,8 +104,7 @@ func New(
 			glamourRenderer: r,
 			htmlConverter:   converter,
 		},
-		ctx:   ctx,
-		debug: debug,
+		ctx: ctx,
 	}
 	model.logf("debug logging enabled")
 	return model
@@ -137,21 +131,12 @@ func Run(
 	uiConfig config.UIConfig,
 	keyMapCfg config.KeyMap,
 ) error {
-	// Set up logging
-	logFile := "/tmp/inbox-debug.log"
-	f, err := tea.LogToFile(logFile, "inbox")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	defer f.Close()
-
 	p := tea.NewProgram(
 		New(ctx, clients, accountNames, accountBadges, theme, uiConfig, keyMapCfg),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 		tea.WithContext(ctx),
 	)
-	_, err = p.Run()
+	_, err := p.Run()
 	return err
 }

@@ -20,9 +20,6 @@ import (
 func runTUI(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer cancel()
-	if debug {
-		os.Setenv("INBOX_DEBUG", "1")
-	}
 
 	// Load config
 	cfg, err := config.Load()

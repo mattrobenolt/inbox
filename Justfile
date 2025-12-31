@@ -13,6 +13,7 @@ lint:
 
 fmt: modernize
     golangci-lint fmt
+    go mod tidy
 
 build:
     go build .

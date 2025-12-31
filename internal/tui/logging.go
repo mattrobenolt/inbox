@@ -1,10 +1,7 @@
 package tui
 
-import "log"
+import "go.withmatt.com/inbox/internal/log"
 
 func (m *Model) logf(format string, args ...any) {
-	if !m.debug {
-		return
-	}
-	log.Printf("DEBUG: "+format, args...)
+	log.Printf(format, args...)
 }

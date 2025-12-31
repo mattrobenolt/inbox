@@ -99,17 +99,3 @@ func Save(cfg *Config) error {
 
 	return nil
 }
-
-// CachePath returns the path to the thread cache file
-func CachePath() (string, error) {
-	return xdg.CacheFile(filepath.Join(appConfigDir, "threads.json"))
-}
-
-// CacheDir returns the directory used for caching.
-func CacheDir() (string, error) {
-	path, err := xdg.CacheFile(filepath.Join(appConfigDir, "threads.json"))
-	if err != nil {
-		return "", err
-	}
-	return filepath.Dir(path), nil
-}
