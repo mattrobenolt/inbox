@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 
 	"github.com/spf13/cobra"
 	gmailapi "google.golang.org/api/gmail/v1"
@@ -18,8 +16,7 @@ import (
 )
 
 func runTUI(cmd *cobra.Command, args []string) error {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer cancel()
+	ctx := cmd.Context()
 
 	// Load config
 	cfg, err := config.Load()

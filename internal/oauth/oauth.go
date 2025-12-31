@@ -81,7 +81,7 @@ func getClient(
 
 	if tok == nil {
 		log.Printf("No token found for %s, starting authentication...", email)
-		tok, err = getTokenFromWeb(oauthCfg, email)
+		tok, err = getTokenFromWeb(ctx, oauthCfg, email)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func getClient(
 	newTok, err := tokenSource.Token()
 	if err != nil {
 		log.Printf("Token refresh failed for %s, re-authenticating...", email)
-		tok, err = getTokenFromWeb(oauthCfg, email)
+		tok, err = getTokenFromWeb(ctx, oauthCfg, email)
 		if err != nil {
 			return nil, err
 		}
@@ -111,13 +111,17 @@ func getClient(
 	return oauth2.NewClient(ctx, tokenSource), nil
 }
 
-func getTokenFromWeb(config *oauth2.Config, email string) (*oauth2.Token, error) {
+func getTokenFromWeb(
+	ctx context.Context,
+	config *oauth2.Config,
+	email string,
+) (*oauth2.Token, error) {
 	if config == nil {
 		return nil, errors.New("missing oauth config")
 	}
 
 	var lc net.ListenConfig
-	listener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	listener, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("unable to start oauth callback server: %w", err)
 	}
@@ -203,14 +207,14 @@ func getTokenFromWeb(config *oauth2.Config, email string) (*oauth2.Token, error)
 		}
 	}()
 
-	waitCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	waitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	select {
 	case code := <-codeCh:
-		_ = server.Shutdown(context.Background())
+		_ = server.Shutdown(ctx)
 		tok, err := cfg.Exchange(
-			context.Background(),
+			ctx,
 			code,
 			oauth2.SetAuthURLParam("code_verifier", pkceVerifier),
 		)
@@ -219,10 +223,10 @@ func getTokenFromWeb(config *oauth2.Config, email string) (*oauth2.Token, error)
 		}
 		return tok, nil
 	case err := <-errCh:
-		_ = server.Shutdown(context.Background())
+		_ = server.Shutdown(ctx)
 		return nil, err
 	case <-waitCtx.Done():
-		_ = server.Shutdown(context.Background())
+		_ = server.Shutdown(ctx)
 		return nil, errors.New("timed out waiting for oauth callback")
 	}
 }

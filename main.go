@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
+
 	"go.withmatt.com/inbox/cmd"
 )
 
 func main() {
-	cmd.Execute()
+	os.Exit(cmd.Execute())
 }
