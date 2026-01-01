@@ -53,6 +53,7 @@ email = "work.email@gmail.com"
 # border_normal = "237"
 # header_label_fg = "241"
 # header_value_fg = "245"
+# link_fg = "cyan"
 # view_mode_bg = "green"
 # view_mode_fg = "background"
 

@@ -3,7 +3,9 @@ package tui
 import (
 	"context"
 
-	md "github.com/JohannesKaufmann/html-to-markdown"
+	md "github.com/JohannesKaufmann/html-to-markdown/v2/converter"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/commonmark"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 
@@ -67,20 +69,20 @@ func New(
 	ui.alert = newAlertModel(theme, 0)
 
 	// Create glamour renderer once for reuse
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStyles(markdownStyle(theme)),
-		glamour.WithEmoji(),
-		glamour.WithWordWrap(80), // Default, will be updated based on terminal width
-	)
+	r, _ := newGlamourRenderer(theme, 80)
 
 	// Create HTML to markdown converter with options
-	converter := md.NewConverter("", true, &md.Options{
-		StrongDelimiter: "**",
-		EmDelimiter:     "_",
-		CodeBlockStyle:  "fenced",
-		LinkStyle:       "inlined",
-		EscapeMode:      "disabled",
-	})
+	converter := md.NewConverter(
+		md.WithPlugins(
+			base.NewBasePlugin(),
+			commonmark.NewCommonmarkPlugin(
+				commonmark.WithStrongDelimiter("**"),
+				commonmark.WithEmDelimiter("_"),
+				commonmark.WithCodeBlockFence("```"),
+			),
+		),
+		md.WithEscapeMode(md.EscapeModeDisabled),
+	)
 
 	model := Model{
 		currentView: viewList,
@@ -102,12 +104,25 @@ func New(
 		accountBadges: accountBadges,
 		renderers: renderersState{
 			glamourRenderer: r,
+			glamourWidth:    80,
 			htmlConverter:   converter,
 		},
 		ctx: ctx,
 	}
 	model.logf("debug logging enabled")
 	return model
+}
+
+func newGlamourRenderer(
+	theme config.Theme,
+	width int,
+) (*glamour.TermRenderer, error) {
+	return glamour.NewTermRenderer(
+		glamour.WithStyles(markdownStyle(theme)),
+		glamour.WithEmoji(),
+		glamour.WithLinkFormatter(smartLinkFormatter()),
+		glamour.WithWordWrap(width),
+	)
 }
 
 // Init initializes the TUI and kicks off inbox loading

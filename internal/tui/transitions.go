@@ -61,12 +61,12 @@ func (m *Model) enterAttachmentView(msg attachmentLoadedMsg) error {
 	}
 
 	raw := string(decoded)
-	rendered := m.renderMarkdown(raw)
+	rendered := m.renderMarkdown(raw, m.ui.width)
 	if isHTMLAttachment(msg.mimeType, msg.filename) {
 		cleanedHTML := cleanHTMLForConversion(raw)
 		markdown, err := m.renderers.htmlConverter.ConvertString(cleanedHTML)
 		if err == nil {
-			rendered = m.renderMarkdown(markdown)
+			rendered = m.renderMarkdown(markdown, m.ui.width)
 		}
 	}
 

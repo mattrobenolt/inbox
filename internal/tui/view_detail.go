@@ -5,36 +5,41 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wordwrap"
 )
 
 func (m *Model) renderDetailView() string {
-	if m.detail.loading {
-		footer := m.renderDetailStatusline(0, false, true, m.detail.messageViewMode)
-		return renderFixedLayout(m.ui.height, "", footer)
-	}
+	body := ""
+	footer := ""
 
-	if len(m.detail.messages) == 0 {
-		footer := m.renderDetailStatusline(0, false, false, m.detail.messageViewMode)
-		return renderFixedLayout(m.ui.height, "No messages loaded", footer)
-	}
+	switch {
+	case m.detail.loading:
+		footer = m.renderDetailStatusline(0, false, true, m.detail.messageViewMode)
+	case len(m.detail.messages) == 0:
+		body = "No messages loaded"
+		footer = m.renderDetailStatusline(0, false, false, m.detail.messageViewMode)
+	default:
+		// Scrollable body with all messages (viewport renders its own content with padding from cards)
+		body = m.detail.viewport.View()
+		scrollPercent := int(m.detail.viewport.ScrollPercent() * 100)
 
-	// Scrollable body with all messages (viewport renders its own content with padding from cards)
-	body := m.detail.viewport.View()
-	scrollPercent := int(m.detail.viewport.ScrollPercent() * 100)
-
-	canToggle := false
-	selectedMode := m.detail.messageViewMode
-	if m.detail.selectedMessageIdx >= 0 && m.detail.selectedMessageIdx < len(m.detail.messages) {
-		msg := m.detail.messages[m.detail.selectedMessageIdx]
-		modes := availableMessageViewModes(msg)
-		if m.detail.expandedMessages[msg.ID] && len(modes) > 0 {
-			canToggle = true
+		canToggle := false
+		selectedMode := m.detail.messageViewMode
+		if m.detail.selectedMessageIdx >= 0 &&
+			m.detail.selectedMessageIdx < len(m.detail.messages) {
+			msg := m.detail.messages[m.detail.selectedMessageIdx]
+			modes := availableMessageViewModes(msg)
+			if m.detail.expandedMessages[msg.ID] && len(modes) > 0 {
+				canToggle = true
+			}
+			selectedMode = normalizeMessageViewMode(selectedMode, msg)
 		}
-		selectedMode = normalizeMessageViewMode(selectedMode, msg)
+		footer = m.renderDetailStatusline(scrollPercent, canToggle, false, selectedMode)
 	}
-	footer := m.renderDetailStatusline(scrollPercent, canToggle, false, selectedMode)
 
-	return renderFixedLayout(m.ui.height, body, footer)
+	rendered := renderFixedLayout(m.ui.height, body, footer)
+	m.debugDumpRender("render-detail", rendered)
+	return rendered
 }
 
 func (m *Model) renderDetailStatusline(
@@ -129,7 +134,8 @@ func (m *Model) renderThreadBody() string {
 
 	selectedPrefix := selectedBarStyle.Render("┃") + " "
 	normalPrefix := "  "
-	contentWidth := max(m.ui.width-2, 0)
+	prefixWidth := max(lipgloss.Width(selectedPrefix), lipgloss.Width(normalPrefix))
+	contentWidth := max(m.ui.width-prefixWidth, 0)
 
 	writeLines := func(prefix string, lines []string) {
 		for i, line := range lines {
@@ -170,7 +176,11 @@ func (m *Model) renderThreadBody() string {
 						rawText = "[Raw message unavailable]"
 					}
 				}
-				content.WriteString(normalizeRawForDisplay(rawText))
+				rawText = normalizeRawForDisplay(rawText)
+				if contentWidth > 0 {
+					rawText = wordwrap.String(rawText, contentWidth)
+				}
+				content.WriteString(rawText)
 			} else {
 				// Expanded view - show full message with headers
 				headerLabelStyle := lipgloss.NewStyle().
@@ -180,22 +190,27 @@ func (m *Model) renderThreadBody() string {
 				headerValueStyle := lipgloss.NewStyle().
 					Foreground(lipgloss.Color(m.theme.Detail.HeaderValueFg))
 
-				content.WriteString(headerLabelStyle.Render("From: "))
-				content.WriteString(headerValueStyle.Render(msg.From))
-				content.WriteString("\n")
-				content.WriteString(headerLabelStyle.Render("To:   "))
-				content.WriteString(headerValueStyle.Render(msg.To))
-				content.WriteString("\n")
-				if msg.Cc != "" {
-					content.WriteString(headerLabelStyle.Render("Cc:   "))
-					content.WriteString(headerValueStyle.Render(msg.Cc))
+				writeHeader := func(label, value string) {
+					labelWidth := lipgloss.Width(label)
+					valueWidth := max(contentWidth-labelWidth, 0)
+					if valueWidth > 0 {
+						value = truncateToWidth(value, valueWidth)
+					} else {
+						value = ""
+					}
+					content.WriteString(headerLabelStyle.Render(label))
+					if value != "" {
+						content.WriteString(headerValueStyle.Render(value))
+					}
 					content.WriteString("\n")
 				}
-				content.WriteString(headerLabelStyle.Render("Date: "))
-				content.WriteString(
-					headerValueStyle.Render(msg.Date.Format("Mon, Jan 2, 2006 at 3:04 PM")),
-				)
-				content.WriteString("\n")
+
+				writeHeader("From: ", msg.From)
+				writeHeader("To:   ", msg.To)
+				if msg.Cc != "" {
+					writeHeader("Cc:   ", msg.Cc)
+				}
+				writeHeader("Date: ", msg.Date.Format("Mon, Jan 2, 2006 at 3:04 PM"))
 
 				// Show attachment count if any
 				if len(msg.Attachments) > 0 {
@@ -203,9 +218,7 @@ func (m *Model) renderThreadBody() string {
 					if len(msg.Attachments) > 1 {
 						attachmentText += "s"
 					}
-					content.WriteString(headerLabelStyle.Render("Attachments: "))
-					content.WriteString(headerValueStyle.Render(attachmentText))
-					content.WriteString("\n")
+					writeHeader("Attachments: ", attachmentText)
 				}
 
 				content.WriteString("\n")
@@ -221,11 +234,11 @@ func (m *Model) renderThreadBody() string {
 						// Fallback to raw HTML if conversion fails
 						bodyText = msg.BodyHTML
 					} else {
-						bodyText = m.renderMarkdown(markdown)
+						bodyText = m.renderMarkdown(markdown, contentWidth)
 					}
 				case effectiveMode == viewModeText && msg.BodyText != "":
 					// Show plain text through glamour
-					bodyText = m.renderMarkdown(msg.BodyText)
+					bodyText = m.renderMarkdown(msg.BodyText, contentWidth)
 				case msg.BodyHTML != "":
 					// Fallback: clean and convert HTML to markdown if no plain text
 					cleanedHTML := cleanHTMLForConversion(msg.BodyHTML)
@@ -233,7 +246,7 @@ func (m *Model) renderThreadBody() string {
 					if err != nil {
 						bodyText = msg.BodyHTML
 					} else {
-						bodyText = m.renderMarkdown(markdown)
+						bodyText = m.renderMarkdown(markdown, contentWidth)
 					}
 				default:
 					bodyText = lipgloss.NewStyle().Italic(true).Render("[No message body]")
@@ -248,7 +261,7 @@ func (m *Model) renderThreadBody() string {
 				preview = preview[:idx]
 			}
 			if contentWidth > 0 {
-				preview = truncateToWidth(preview, contentWidth-2)
+				preview = truncateToWidth(preview, max(contentWidth-2, 0))
 			}
 
 			content.WriteString(from)
@@ -258,7 +271,8 @@ func (m *Model) renderThreadBody() string {
 			content.WriteString(snippetStyle.Render(preview))
 		}
 
-		lines := strings.Split(content.String(), "\n")
+		contentText := content.String()
+		lines := strings.Split(contentText, "\n")
 		writeLines(prefix, lines)
 
 		if i < len(m.detail.messages)-1 {

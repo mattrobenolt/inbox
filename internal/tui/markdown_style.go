@@ -11,6 +11,7 @@ func markdownStyle(theme config.Theme) ansi.StyleConfig {
 	style := styles.DarkStyleConfig
 
 	style.Document.Color = ptr(theme.Status.Fg)
+	style.Document.Margin = ptr(uint(0))
 	style.Paragraph.Color = ptr(theme.Status.Fg)
 	style.Text.Color = ptr(theme.Status.Fg)
 
@@ -28,9 +29,10 @@ func markdownStyle(theme config.Theme) ansi.StyleConfig {
 
 	style.HorizontalRule.Color = ptr(theme.Status.Dim)
 
-	style.Link.Color = ptr(theme.Status.TabBg)
-	style.LinkText.Color = ptr(theme.Status.TabBg)
+	style.Link.Color = ptr(theme.Detail.LinkFg)
+	style.LinkText.Color = ptr(theme.Detail.LinkFg)
 	style.LinkText.Bold = ptr(true)
+	style.LinkText.Underline = ptr(true)
 
 	style.Code.Color = ptr(theme.Status.Fg)
 	style.Code.BackgroundColor = ptr(theme.Detail.BorderNormal)

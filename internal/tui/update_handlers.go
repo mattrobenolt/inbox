@@ -338,6 +338,9 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, km.detail.Quit):
 		return m, tea.Quit
+	case msg.String() == "X":
+		m.debugDumpCurrentMessage()
+		return m, nil
 	case key.Matches(msg, km.detail.Help):
 		m.ui.showHelp = true
 		return m, nil

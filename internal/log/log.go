@@ -34,6 +34,10 @@ func Close() error {
 	return logFile.Close()
 }
 
+func DebugEnabled() bool {
+	return debugEnabled
+}
+
 func Printf(format string, args ...any) {
 	if debugEnabled {
 		stdlog.Printf("DEBUG: "+format, args...)

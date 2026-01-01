@@ -40,6 +40,7 @@ type ThemeDetail struct {
 	BorderNormal   string `toml:"border_normal"`
 	HeaderLabelFg  string `toml:"header_label_fg"`
 	HeaderValueFg  string `toml:"header_value_fg"`
+	LinkFg         string `toml:"link_fg"`
 	ViewModeBg     string `toml:"view_mode_bg"`
 	ViewModeFg     string `toml:"view_mode_fg"`
 }
@@ -113,6 +114,12 @@ func themeFromPalette(palette *themes.Theme) Theme {
 		palette.Green,
 		palette.Foreground,
 	)
+	linkFg := firstNonEmpty(
+		palette.Cyan,
+		palette.BrightCyan,
+		palette.Blue,
+		palette.Foreground,
+	)
 	borderNormal := firstNonEmpty(
 		// palette.BrightBlack,
 		// palette.Black,
@@ -144,6 +151,7 @@ func themeFromPalette(palette *themes.Theme) Theme {
 			BorderNormal:   borderNormal,
 			HeaderLabelFg:  dim,
 			HeaderValueFg:  palette.Foreground,
+			LinkFg:         linkFg,
 			ViewModeBg:     viewModeBg,
 			ViewModeFg:     viewModeFg,
 		},
@@ -182,6 +190,7 @@ func mergeTheme(base, override Theme) Theme {
 	fillIfEmpty(&out.Detail.BorderNormal, base.Detail.BorderNormal)
 	fillIfEmpty(&out.Detail.HeaderLabelFg, base.Detail.HeaderLabelFg)
 	fillIfEmpty(&out.Detail.HeaderValueFg, base.Detail.HeaderValueFg)
+	fillIfEmpty(&out.Detail.LinkFg, base.Detail.LinkFg)
 	fillIfEmpty(&out.Detail.ViewModeBg, base.Detail.ViewModeBg)
 	fillIfEmpty(&out.Detail.ViewModeFg, base.Detail.ViewModeFg)
 
@@ -254,6 +263,7 @@ func resolveThemeColorNames(theme Theme, palette *themes.Theme) Theme {
 	theme.Detail.BorderNormal = resolveColorName(theme.Detail.BorderNormal, palette)
 	theme.Detail.HeaderLabelFg = resolveColorName(theme.Detail.HeaderLabelFg, palette)
 	theme.Detail.HeaderValueFg = resolveColorName(theme.Detail.HeaderValueFg, palette)
+	theme.Detail.LinkFg = resolveColorName(theme.Detail.LinkFg, palette)
 	theme.Detail.ViewModeBg = resolveColorName(theme.Detail.ViewModeBg, palette)
 	theme.Detail.ViewModeFg = resolveColorName(theme.Detail.ViewModeFg, palette)
 

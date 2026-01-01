@@ -1,7 +1,7 @@
 package tui
 
 import (
-	md "github.com/JohannesKaufmann/html-to-markdown"
+	md "github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -23,6 +23,8 @@ type uiState struct {
 	showHelp  bool
 	showError bool
 	err       error
+
+	debugDumpHashes map[string][32]byte
 }
 
 type inboxState struct {
@@ -86,6 +88,8 @@ type imageState struct {
 
 type renderersState struct {
 	glamourRenderer *glamour.TermRenderer
+	glamourWidth    int
+	loggedHyperlink bool
 	htmlConverter   *md.Converter
 }
 
@@ -137,6 +141,7 @@ func newDetailState() detailState {
 	return detailState{
 		viewport:         viewport.New(0, 0),
 		expandedMessages: make(map[string]bool),
+		messageViewMode:  viewModeHTML,
 		rawLoading:       make(map[string]bool),
 	}
 }
@@ -183,7 +188,7 @@ func (m *Model) resetDetail() {
 	m.detail.loading = false
 	m.detail.expandedMessages = make(map[string]bool)
 	m.detail.selectedMessageIdx = 0
-	m.detail.messageViewMode = viewModeText
+	m.detail.messageViewMode = viewModeHTML
 	m.detail.savedViewportYOffset = 0
 	m.detail.rawLoading = make(map[string]bool)
 }
