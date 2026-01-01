@@ -150,6 +150,7 @@ func Run(
 		New(ctx, clients, accountNames, accountBadges, theme, uiConfig, keyMapCfg),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
+		tea.WithReportFocus(),
 		tea.WithContext(ctx),
 	)
 	_, err := p.Run()

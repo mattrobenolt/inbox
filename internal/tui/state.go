@@ -23,6 +23,7 @@ type uiState struct {
 	showHelp  bool
 	showError bool
 	err       error
+	focused   bool
 
 	debugDumpHashes map[string][32]byte
 }
@@ -134,7 +135,10 @@ func newUIState() uiState {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = s.Style.Foreground(s.Style.GetForeground())
-	return uiState{spinner: s}
+	return uiState{
+		spinner: s,
+		focused: true,
+	}
 }
 
 func newDetailState() detailState {

@@ -17,6 +17,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd = m.updateKey(msg)
 	case tea.MouseMsg:
 		model, cmd = m.updateMouse(msg)
+	case tea.FocusMsg:
+		m.ui.focused = true
+		model = m
+	case tea.BlurMsg:
+		m.ui.focused = false
+		model = m
 	case inboxLoadedMsg:
 		model, cmd = m.handleInboxLoaded(msg)
 	case threadMetadataLoadedMsg:

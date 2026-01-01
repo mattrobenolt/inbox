@@ -58,6 +58,10 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if !m.ui.focused {
+		return m, nil
+	}
+
 	switch m.currentView {
 	case viewList:
 		switch msg.Button {
