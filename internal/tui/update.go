@@ -53,7 +53,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case searchRemoteLoadedMsg:
 		model, cmd = m.handleSearchRemoteLoaded(msg)
 	case autoRefreshMsg:
-		model, cmd = m.handleAutoRefresh(msg)
+		model, cmd = m.handleAutoRefresh()
+	case linkScanFinishedMsg:
+		model = m.handleLinkScanFinished(msg)
 	case tea.WindowSizeMsg:
 		model, cmd = m.handleWindowSize(msg)
 	default:

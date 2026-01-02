@@ -69,8 +69,29 @@ You can configure:
 - Keybindings
 - Interface density (snippet lines)
 - Account badges
+- Link unwrapping and DNS resolution
 
 See [`config.toml.example`](config.toml.example) for a full reference.
+
+### Link unwrapping
+
+Configure tracking/redirect domains in `config.toml` under `[links]`. When enabled, expanded messages resolve redirecting URLs and update the rendered output once resolution completes.
+
+```toml
+[links]
+auto_scan = true
+unwrap_domains = ["t.co", "click.example.com"]
+do_not_resolve = ["github.com"]
+dns_mode = "custom"
+dns_servers = ["1.1.1.1", "1.0.0.1"]
+```
+
+`auto_scan` learns new redirecting domains by probing links in expanded messages. Learned domains are stored in the cache and used automatically. To manage them:
+
+```bash
+inbox links list
+inbox links save
+```
 
 ## Development
 
@@ -89,8 +110,7 @@ direnv allow
 ```bash
 git clone https://github.com/mattrobenolt/inbox
 cd inbox
-just build
-./inbox
+just run
 ```
 
 ## License

@@ -403,15 +403,22 @@ func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.detail.selectedMessageIdx < len(m.detail.messages) {
 			msgID := m.detail.messages[m.detail.selectedMessageIdx].ID
 			m.detail.expandedMessages[msgID] = !m.detail.expandedMessages[msgID]
-			var rawCmd tea.Cmd
+			var cmds []tea.Cmd
 			if m.detail.messageViewMode == viewModeRaw {
-				rawCmd = m.loadRawForExpandedMessages()
+				cmds = append(cmds, m.loadRawForExpandedMessages())
+			}
+			if m.detail.expandedMessages[msgID] {
+				if scanCmd := m.scanMessageLinksCmd(
+					m.detail.messages[m.detail.selectedMessageIdx],
+				); scanCmd != nil {
+					cmds = append(cmds, scanCmd)
+				}
 			}
 			// Re-render
 			body := m.renderThreadBody()
 			m.detail.viewport.SetContent(body)
-			if rawCmd != nil {
-				return m, rawCmd
+			if len(cmds) > 0 {
+				return m, tea.Batch(cmds...)
 			}
 		}
 	}
@@ -684,14 +691,20 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
 
 	// Expand the first (most recent) message by default
 	m.detail.expandedMessages = make(map[string]bool)
+	m.detail.linkScanAttempted = make(map[string]bool)
 	if len(m.detail.messages) > 0 {
 		m.detail.expandedMessages[m.detail.messages[0].ID] = true
 	}
 	m.detail.selectedMessageIdx = 0
 
-	var rawCmd tea.Cmd
+	var cmds []tea.Cmd
 	if m.detail.messageViewMode == viewModeRaw {
-		rawCmd = m.loadRawForExpandedMessages()
+		cmds = append(cmds, m.loadRawForExpandedMessages())
+	}
+	if len(m.detail.messages) > 0 {
+		if scanCmd := m.scanMessageLinksCmd(m.detail.messages[0]); scanCmd != nil {
+			cmds = append(cmds, scanCmd)
+		}
 	}
 
 	// Update viewport size first
@@ -702,7 +715,22 @@ func (m Model) handleThreadLoaded(msg threadLoadedMsg) (tea.Model, tea.Cmd) {
 	m.detail.viewport.SetContent(body)
 	// Reset scroll position to top
 	m.detail.viewport.GotoTop()
-	return m, rawCmd
+	if len(cmds) == 0 {
+		return m, nil
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleLinkScanFinished(msg linkScanFinishedMsg) Model {
+	if m.currentView != viewDetail || msg.messageID == "" {
+		return m
+	}
+	if !m.detail.expandedMessages[msg.messageID] {
+		return m
+	}
+	body := m.renderThreadBody()
+	m.detail.viewport.SetContent(body)
+	return m
 }
 
 func (m Model) handleThreadMarked(msg threadMarkedMsg) Model {
@@ -960,7 +988,7 @@ func (m Model) handleSearchRemoteLoaded(msg searchRemoteLoadedMsg) (tea.Model, t
 	return m, m.loadThreadsMetadataCmd(newIndices)
 }
 
-func (m Model) handleAutoRefresh(msg autoRefreshMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAutoRefresh() (tea.Model, tea.Cmd) {
 	if m.uiConfig.RefreshIntervalSeconds <= 0 {
 		return m, nil
 	}

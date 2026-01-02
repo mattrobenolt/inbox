@@ -64,6 +64,7 @@ func cleanHTMLForConversion(html string) string {
 // renderMarkdown renders markdown/plaintext with glamour (reuses model's renderer).
 func (m *Model) renderMarkdown(text string, width int) string {
 	text = sanitizeImageMarkdown(text)
+	text = m.linkResolver.ResolveText(m.ctx, text)
 	m.ensureGlamourRenderer(width)
 	if m.renderers.glamourRenderer == nil {
 		return text

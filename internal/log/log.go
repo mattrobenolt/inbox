@@ -22,7 +22,7 @@ func Setup(debug bool) error {
 	if err != nil {
 		return err
 	}
-	logFile, err = tea.LogToFile(logPath, "inbox")
+	logFile, err = tea.LogToFile(logPath, "")
 	return err
 }
 

@@ -22,7 +22,7 @@ func (m *Model) windowTitle() string {
 
 	switch m.currentView {
 	case viewList:
-		return formatWindowTitle("Inbox")
+		return formatWindowTitle("")
 	case viewDetail:
 		return formatWindowTitle(m.detailTitle())
 	case viewAttachment:

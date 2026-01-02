@@ -37,9 +37,7 @@ func (m *Model) renderDetailView() string {
 		footer = m.renderDetailStatusline(scrollPercent, canToggle, false, selectedMode)
 	}
 
-	rendered := renderFixedLayout(m.ui.height, body, footer)
-	m.debugDumpRender("render-detail", rendered)
-	return rendered
+	return renderFixedLayout(m.ui.height, body, footer)
 }
 
 func (m *Model) renderDetailStatusline(

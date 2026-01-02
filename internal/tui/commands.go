@@ -32,6 +32,10 @@ type messageRawLoadedMsg struct {
 	err       error
 }
 
+type linkScanFinishedMsg struct {
+	messageID string
+}
+
 type inboxLoadSource int
 
 const (

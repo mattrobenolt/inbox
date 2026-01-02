@@ -21,10 +21,11 @@ type Account struct {
 
 // Config represents the inbox configuration
 type Config struct {
-	Accounts []Account `toml:"accounts"`
-	Theme    Theme     `toml:"theme"`
-	UI       UIConfig  `toml:"ui"`
-	Keys     KeyMap    `toml:"keys"`
+	Accounts []Account  `toml:"accounts"`
+	Theme    Theme      `toml:"theme"`
+	UI       UIConfig   `toml:"ui"`
+	Keys     KeyMap     `toml:"keys"`
+	Links    LinkConfig `toml:"links"`
 }
 
 // ConfigDir returns the directory where config files are stored

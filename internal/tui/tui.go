@@ -11,6 +11,7 @@ import (
 
 	"go.withmatt.com/inbox/internal/config"
 	"go.withmatt.com/inbox/internal/gmail"
+	"go.withmatt.com/inbox/internal/links"
 )
 
 type viewState int
@@ -34,16 +35,18 @@ const (
 type Model struct {
 	currentView viewState
 
-	ui          uiState
-	inbox       inboxState
-	detail      detailState
-	attachments attachmentState
-	image       imageState
-	renderers   renderersState
-	search      searchState
-	theme       config.Theme
-	uiConfig    config.UIConfig
-	keyMapCfg   config.KeyMap
+	ui           uiState
+	inbox        inboxState
+	detail       detailState
+	attachments  attachmentState
+	image        imageState
+	renderers    renderersState
+	search       searchState
+	theme        config.Theme
+	uiConfig     config.UIConfig
+	keyMapCfg    config.KeyMap
+	linkResolver *links.Resolver
+	linkAutoScan bool
 
 	// Gmail clients for fetching data (one per account)
 	clients       []*gmail.Client
@@ -63,6 +66,8 @@ func New(
 	theme config.Theme,
 	uiConfig config.UIConfig,
 	keyMapCfg config.KeyMap,
+	linkResolver *links.Resolver,
+	linkAutoScan bool,
 ) Model {
 	ui := newUIState()
 	ui.help = newHelpModel(theme)
@@ -99,6 +104,8 @@ func New(
 		theme:         theme,
 		uiConfig:      uiConfig,
 		keyMapCfg:     keyMapCfg,
+		linkResolver:  linkResolver,
+		linkAutoScan:  linkAutoScan,
 		clients:       clients,
 		accountNames:  accountNames,
 		accountBadges: accountBadges,
@@ -145,9 +152,21 @@ func Run(
 	theme config.Theme,
 	uiConfig config.UIConfig,
 	keyMapCfg config.KeyMap,
+	linkResolver *links.Resolver,
+	linkAutoScan bool,
 ) error {
 	p := tea.NewProgram(
-		New(ctx, clients, accountNames, accountBadges, theme, uiConfig, keyMapCfg),
+		New(
+			ctx,
+			clients,
+			accountNames,
+			accountBadges,
+			theme,
+			uiConfig,
+			keyMapCfg,
+			linkResolver,
+			linkAutoScan,
+		),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 		tea.WithReportFocus(),

@@ -7,6 +7,18 @@ list_snippet_lines = 2
 # Auto refresh interval in seconds (default: 300, set to -1 to disable)
 refresh_interval_seconds = 300
 
+[links]
+# Domains to unwrap via redirects (e.g. tracking links).
+# unwrap_domains = ["t.co", "click.example.com"]
+# Domains to skip resolving (even if learned or configured elsewhere).
+# do_not_resolve = ["github.com"]
+# Enable auto-scanning expanded messages to learn redirecting domains.
+# auto_scan = false
+# DNS resolution mode: "custom" (default) or "system".
+# dns_mode = "custom"
+# DNS servers used when dns_mode = "custom".
+# dns_servers = ["1.1.1.1", "1.0.0.1"]
+
 [[accounts]]
 name = "Personal"
 email = "your.email@gmail.com"

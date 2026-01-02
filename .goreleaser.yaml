@@ -50,4 +50,5 @@ homebrew_casks:
           end
     zap:
       trash:
-        - "~/Library/Application Support/inbox"
+        - '~/Library/Application Support/inbox'
+        - '~/Library/Caches/inbox'

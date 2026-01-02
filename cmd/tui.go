@@ -11,6 +11,8 @@ import (
 
 	"go.withmatt.com/inbox/internal/config"
 	"go.withmatt.com/inbox/internal/gmail"
+	"go.withmatt.com/inbox/internal/links"
+	"go.withmatt.com/inbox/internal/log"
 	"go.withmatt.com/inbox/internal/oauth"
 	"go.withmatt.com/inbox/internal/tui"
 )
@@ -60,7 +62,18 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unable to resolve theme: %w", err)
 	}
 	uiConfig := cfg.UI.WithDefaults()
-	if err := tui.Run(ctx, clients, accountNames, accountBadges, theme, uiConfig, cfg.Keys); err != nil {
+	linkResolver := links.NewResolver(cfg.Links, log.Printf)
+	if err := tui.Run(
+		ctx,
+		clients,
+		accountNames,
+		accountBadges,
+		theme,
+		uiConfig,
+		cfg.Keys,
+		linkResolver,
+		cfg.Links.AutoScan,
+	); err != nil {
 		return fmt.Errorf("error running TUI: %w", err)
 	}
 	return nil
